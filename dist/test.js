@@ -40,11 +40,12 @@
    * ```
    *
    * @function
-   * @template T,K
-   * @param {Map<K, T>} map
+   * @template V,K
+   * @template {Map<K,V>} MAP
+   * @param {MAP} map
    * @param {K} key
-   * @param {function():T} createT
-   * @return {T}
+   * @param {function():V} createT
+   * @return {V}
    */
   const setIfUndefined = (map, key, createT) => {
     let set = map.get(key);
@@ -112,7 +113,7 @@
    * Return the last element of an array. The element must exist
    *
    * @template L
-   * @param {Array<L>} arr
+   * @param {ArrayLike<L>} arr
    * @return {L}
    */
   const last = arr => arr[arr.length - 1];
@@ -139,6 +140,8 @@
    * @return {T}
    */
   const from = Array.from;
+
+  const isArray = Array.isArray;
 
   /**
    * Observable class prototype.
@@ -266,12 +269,6 @@
   const isNegativeZero = n => n !== 0 ? n < 0 : 1 / n < 0;
 
   /**
-   * Utility module to work with strings.
-   *
-   * @module string
-   */
-
-  /**
    * @param {string} s
    * @return {string}
    */
@@ -294,20 +291,47 @@
    */
   const fromCamelCase = (s, separator) => trimLeft(s.replace(fromCamelCaseRegex, match => `${separator}${toLowerCase(match)}`));
 
-  /* istanbul ignore next */
+  /**
+   * @param {string} str
+   * @return {Uint8Array}
+   */
+  const _encodeUtf8Polyfill = str => {
+    const encodedString = unescape(encodeURIComponent(str));
+    const len = encodedString.length;
+    const buf = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      buf[i] = /** @type {number} */ (encodedString.codePointAt(i));
+    }
+    return buf
+  };
+
+  /* c8 ignore next */
   const utf8TextEncoder = /** @type {TextEncoder} */ (typeof TextEncoder !== 'undefined' ? new TextEncoder() : null);
 
-  /* istanbul ignore next */
+  /**
+   * @param {string} str
+   * @return {Uint8Array}
+   */
+  const _encodeUtf8Native = str => utf8TextEncoder.encode(str);
+
+  /**
+   * @param {string} str
+   * @return {Uint8Array}
+   */
+  /* c8 ignore next */
+  const encodeUtf8 = utf8TextEncoder ? _encodeUtf8Native : _encodeUtf8Polyfill;
+
+  /* c8 ignore next */
   let utf8TextDecoder = typeof TextDecoder === 'undefined' ? null : new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 
-  /* istanbul ignore next */
+  /* c8 ignore start */
   if (utf8TextDecoder && utf8TextDecoder.decode(new Uint8Array()).length === 1) {
     // Safari doesn't handle BOM correctly.
     // This fixes a bug in Safari 13.0.5 where it produces a BOM the first time it is called.
     // utf8TextDecoder.decode(new Uint8Array()).length === 1 on the first call and
     // utf8TextDecoder.decode(new Uint8Array()).length === 1 on the second call
     // Another issue is that from then on no BOM chars are recognized anymore
-    /* istanbul ignore next */
+    /* c8 ignore next */
     utf8TextDecoder = null;
   }
 
@@ -322,10 +346,10 @@
    * @param {T|null|undefined} v
    * @return {T|null}
    */
-  /* istanbul ignore next */
+  /* c8 ignore next */
   const undefinedToNull = v => v === undefined ? null : v;
 
-  /* global localStorage, addEventListener */
+  /* eslint-env browser */
 
   /**
    * Isomorphic variable storage.
@@ -335,7 +359,7 @@
    * @module storage
    */
 
-  /* istanbul ignore next */
+  /* c8 ignore start */
   class VarStoragePolyfill {
     constructor () {
       this.map = new Map();
@@ -356,28 +380,160 @@
       return this.map.get(key)
     }
   }
+  /* c8 ignore stop */
 
-  /* istanbul ignore next */
   /**
    * @type {any}
    */
   let _localStorage = new VarStoragePolyfill();
   let usePolyfill = true;
 
+  /* c8 ignore start */
   try {
     // if the same-origin rule is violated, accessing localStorage might thrown an error
-    /* istanbul ignore next */
     if (typeof localStorage !== 'undefined') {
       _localStorage = localStorage;
       usePolyfill = false;
     }
   } catch (e) { }
+  /* c8 ignore stop */
 
-  /* istanbul ignore next */
   /**
    * This is basically localStorage in browser, or a polyfill in nodejs
    */
+  /* c8 ignore next */
   const varStorage = _localStorage;
+
+  /**
+   * Utility functions for working with EcmaScript objects.
+   *
+   * @module object
+   */
+
+  /**
+   * Object.assign
+   */
+  const assign = Object.assign;
+
+  /**
+   * @param {Object<string,any>} obj
+   */
+  const keys = Object.keys;
+
+  /**
+   * @template V
+   * @param {{[k:string]:V}} obj
+   * @param {function(V,string):any} f
+   */
+  const forEach = (obj, f) => {
+    for (const key in obj) {
+      f(obj[key], key);
+    }
+  };
+
+  /**
+   * @todo implement mapToArray & map
+   *
+   * @template R
+   * @param {Object<string,any>} obj
+   * @param {function(any,string):R} f
+   * @return {Array<R>}
+   */
+  const map$1 = (obj, f) => {
+    const results = [];
+    for (const key in obj) {
+      results.push(f(obj[key], key));
+    }
+    return results
+  };
+
+  /**
+   * @param {Object<string,any>} obj
+   * @return {number}
+   */
+  const length = obj => keys(obj).length;
+
+  /**
+   * @param {Object|undefined} obj
+   */
+  const isEmpty = obj => {
+    for (const _k in obj) {
+      return false
+    }
+    return true
+  };
+
+  /**
+   * @param {Object<string,any>} obj
+   * @param {function(any,string):boolean} f
+   * @return {boolean}
+   */
+  const every = (obj, f) => {
+    for (const key in obj) {
+      if (!f(obj[key], key)) {
+        return false
+      }
+    }
+    return true
+  };
+
+  /**
+   * Calls `Object.prototype.hasOwnProperty`.
+   *
+   * @param {any} obj
+   * @param {string|symbol} key
+   * @return {boolean}
+   */
+  const hasProperty = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+
+  /**
+   * @param {Object<string,any>} a
+   * @param {Object<string,any>} b
+   * @return {boolean}
+   */
+  const equalFlat = (a, b) => a === b || (length(a) === length(b) && every(a, (val, key) => (val !== undefined || hasProperty(b, key)) && b[key] === val));
+
+  /**
+   * Common functions and function call helpers.
+   *
+   * @module function
+   */
+
+  /**
+   * Calls all functions in `fs` with args. Only throws after all functions were called.
+   *
+   * @param {Array<function>} fs
+   * @param {Array<any>} args
+   */
+  const callAll = (fs, args, i = 0) => {
+    try {
+      for (; i < fs.length; i++) {
+        fs[i](...args);
+      }
+    } finally {
+      if (i < fs.length) {
+        callAll(fs, args, i + 1);
+      }
+    }
+  };
+
+  /**
+   * @template A
+   *
+   * @param {A} a
+   * @return {A}
+   */
+  const id = a => a;
+
+  /**
+   * @template V
+   * @template {V} OPTS
+   *
+   * @param {V} value
+   * @param {Array<OPTS>} options
+   */
+  // @ts-ignore
+  const isOneOf = (value, options) => options.includes(value);
 
   /**
    * Isomorphic module to work access the environment (query params, env variables).
@@ -385,27 +541,29 @@
    * @module map
    */
 
-  /* istanbul ignore next */
+  /* c8 ignore next */
   // @ts-ignore
-  const isNode = typeof process !== 'undefined' && process.release && /node|io\.js/.test(process.release.name);
-  /* istanbul ignore next */
-  const isBrowser = typeof window !== 'undefined' && !isNode;
-  /* istanbul ignore next */
-  const isMac = typeof navigator !== 'undefined' ? /Mac/.test(navigator.platform) : false;
+  const isNode = typeof process !== 'undefined' && process.release &&
+    /node|io\.js/.test(process.release.name);
+  /* c8 ignore next */
+  const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined' && !isNode;
+  /* c8 ignore next 3 */
+  const isMac = typeof navigator !== 'undefined'
+    ? /Mac/.test(navigator.platform)
+    : false;
 
   /**
    * @type {Map<string,string>}
    */
   let params;
 
-  /* istanbul ignore next */
+  /* c8 ignore start */
   const computeParams = () => {
     if (params === undefined) {
       if (isNode) {
         params = create();
         const pargs = process.argv;
         let currParamName = null;
-        /* istanbul ignore next */
         for (let i = 0; i < pargs.length; i++) {
           const parg = pargs[i];
           if (parg[0] === '-') {
@@ -423,11 +581,10 @@
         if (currParamName !== null) {
           params.set(currParamName, '');
         }
-      // in ReactNative for example this would not be true (unless connected to the Remote Debugger)
+        // in ReactNative for example this would not be true (unless connected to the Remote Debugger)
       } else if (typeof location === 'object') {
-        params = create()
-        // eslint-disable-next-line no-undef
-        ;(location.search || '?').slice(1).split('&').forEach(kv => {
+        params = create(); // eslint-disable-next-line no-undef
+        (location.search || '?').slice(1).split('&').forEach((kv) => {
           if (kv.length !== 0) {
             const [key, value] = kv.split('=');
             params.set(`--${fromCamelCase(key, '-')}`, value);
@@ -440,39 +597,57 @@
     }
     return params
   };
+  /* c8 ignore stop */
 
   /**
    * @param {string} name
    * @return {boolean}
    */
-  /* istanbul ignore next */
-  const hasParam = name => computeParams().has(name);
+  /* c8 ignore next */
+  const hasParam = (name) => computeParams().has(name);
 
   /**
    * @param {string} name
    * @param {string} defaultVal
    * @return {string}
    */
-  /* istanbul ignore next */
-  const getParam = (name, defaultVal) => computeParams().get(name) || defaultVal;
-  // export const getArgs = name => computeParams() && args
+  /* c8 ignore next 2 */
+  const getParam = (name, defaultVal) =>
+    computeParams().get(name) || defaultVal;
 
   /**
    * @param {string} name
    * @return {string|null}
    */
-  /* istanbul ignore next */
-  const getVariable = name => isNode ? undefinedToNull(process.env[name.toUpperCase()]) : undefinedToNull(varStorage.getItem(name));
+  /* c8 ignore next 4 */
+  const getVariable = (name) =>
+    isNode
+      ? undefinedToNull(process.env[name.toUpperCase()])
+      : undefinedToNull(varStorage.getItem(name));
 
   /**
    * @param {string} name
    * @return {boolean}
    */
-  /* istanbul ignore next */
-  const hasConf = name => hasParam('--' + name) || getVariable(name) !== null;
+  /* c8 ignore next 2 */
+  const hasConf = (name) =>
+    hasParam('--' + name) || getVariable(name) !== null;
 
-  /* istanbul ignore next */
+  /* c8 ignore next */
   const production = hasConf('production');
+
+  /* c8 ignore next 2 */
+  const forceColor = isNode &&
+    isOneOf(process.env.FORCE_COLOR, ['true', '1', '2']);
+
+  /* c8 ignore start */
+  const supportsColor = !hasParam('no-colors') &&
+    (!isNode || process.stdout.isTTY || forceColor) && (
+    !isNode || hasParam('color') || forceColor ||
+      getVariable('COLORTERM') !== null ||
+      (getVariable('TERM') || '').includes('color')
+  );
+  /* c8 ignore stop */
 
   /* eslint-env browser */
 
@@ -507,6 +682,48 @@
   const BITS32 = 0xFFFFFFFF;
 
   /**
+   * Utility helpers for working with numbers.
+   *
+   * @module number
+   */
+
+  const MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER;
+
+  /* c8 ignore next */
+  const isInteger = Number.isInteger || (num => typeof num === 'number' && isFinite(num) && floor(num) === num);
+
+  /**
+   * Error helpers.
+   *
+   * @module error
+   */
+
+  /**
+   * @param {string} s
+   * @return {Error}
+   */
+  /* c8 ignore next */
+  const create$2 = s => new Error(s);
+
+  /**
+   * @throws {Error}
+   * @return {never}
+   */
+  /* c8 ignore next 3 */
+  const methodUnimplemented = () => {
+    throw create$2('Method unimplemented')
+  };
+
+  /**
+   * @throws {Error}
+   * @return {never}
+   */
+  /* c8 ignore next 3 */
+  const unexpectedCase = () => {
+    throw create$2('Unexpected case')
+  };
+
+  /**
    * Efficient schema-less binary decoding with support for variable length encoding.
    *
    * Use [lib0/decoding] with [lib0/encoding]. Every encoding function has a corresponding decoding function.
@@ -517,7 +734,7 @@
    *
    * ```js
    * // encoding step
-   * const encoder = new encoding.createEncoder()
+   * const encoder = encoding.createEncoder()
    * encoding.writeVarUint(encoder, 256)
    * encoding.writeVarString(encoder, 'Hello world!')
    * const buf = encoding.toUint8Array(encoder)
@@ -525,7 +742,7 @@
    *
    * ```js
    * // decoding step
-   * const decoder = new decoding.createDecoder(buf)
+   * const decoder = decoding.createDecoder(buf)
    * decoding.readVarUint(decoder) // => 256
    * decoding.readVarString(decoder) // => 'Hello world!'
    * decoding.hasContent(decoder) // => false - all data is read
@@ -533,6 +750,9 @@
    *
    * @module decoding
    */
+
+  const errorUnexpectedEndOfArray = create$2('Unexpected end of array');
+  const errorIntegerOutOfRange = create$2('Integer out of Range');
 
   /**
    * A Decoder handles the decoding of an Uint8Array.
@@ -620,19 +840,23 @@
    */
   const readVarUint = decoder => {
     let num = 0;
-    let len = 0;
-    while (true) {
+    let mult = 1;
+    const len = decoder.arr.length;
+    while (decoder.pos < len) {
       const r = decoder.arr[decoder.pos++];
-      num = num | ((r & BITS7) << len);
-      len += 7;
+      // num = num | ((r & binary.BITS7) << len)
+      num = num + (r & BITS7) * mult; // shift $r << (7*#iterations) and add it to num
+      mult *= 128; // next iteration, shift 7 "more" to the left
       if (r < BIT8) {
-        return num >>> 0 // return unsigned number!
+        return num
       }
-      /* istanbul ignore if */
-      if (len > 53) {
-        throw new Error('Integer out of range!')
+      /* c8 ignore start */
+      if (num > MAX_SAFE_INTEGER) {
+        throw errorIntegerOutOfRange
       }
+      /* c8 ignore stop */
     }
+    throw errorUnexpectedEndOfArray
   };
 
   /**
@@ -649,29 +873,33 @@
   const readVarInt = decoder => {
     let r = decoder.arr[decoder.pos++];
     let num = r & BITS6;
-    let len = 6;
+    let mult = 64;
     const sign = (r & BIT7) > 0 ? -1 : 1;
     if ((r & BIT8) === 0) {
       // don't continue reading
       return sign * num
     }
-    while (true) {
+    const len = decoder.arr.length;
+    while (decoder.pos < len) {
       r = decoder.arr[decoder.pos++];
-      num = num | ((r & BITS7) << len);
-      len += 7;
+      // num = num | ((r & binary.BITS7) << len)
+      num = num + (r & BITS7) * mult;
+      mult *= 128;
       if (r < BIT8) {
-        return sign * (num >>> 0)
+        return sign * num
       }
-      /* istanbul ignore if */
-      if (len > 53) {
-        throw new Error('Integer out of range!')
+      /* c8 ignore start */
+      if (num > MAX_SAFE_INTEGER) {
+        throw errorIntegerOutOfRange
       }
+      /* c8 ignore stop */
     }
+    throw errorUnexpectedEndOfArray
   };
 
   /**
-   * Read string of variable length
-   * * varUint is used to store the length of the string
+   * We don't test this function anymore as we use native decoding/encoding by default now.
+   * Better not modify this anymore..
    *
    * Transforming utf8 to a string is pretty expensive. The code performs 10x better
    * when String.fromCodePoint is fed with all characters as arguments.
@@ -682,7 +910,8 @@
    * @param {Decoder} decoder
    * @return {String} The read String.
    */
-  const readVarString = decoder => {
+  /* c8 ignore start */
+  const _readVarStringPolyfill = decoder => {
     let remainingLen = readVarUint(decoder);
     if (remainingLen === 0) {
       return ''
@@ -706,6 +935,27 @@
       return decodeURIComponent(escape(encodedString))
     }
   };
+  /* c8 ignore stop */
+
+  /**
+   * @function
+   * @param {Decoder} decoder
+   * @return {String} The read String
+   */
+  const _readVarStringNative = decoder =>
+    /** @type any */ (utf8TextDecoder).decode(readVarUint8Array(decoder));
+
+  /**
+   * Read string of variable length
+   * * varUint is used to store the length of the string
+   *
+   * @function
+   * @param {Decoder} decoder
+   * @return {String} The read String
+   *
+   */
+  /* c8 ignore next */
+  const readVarString = utf8TextDecoder ? _readVarStringNative : _readVarStringPolyfill;
 
   /**
    * @param {Decoder} decoder
@@ -863,7 +1113,7 @@
         const diff = readVarInt(this);
         // if the first bit is set, we read more data
         const hasCount = diff & 1;
-        this.diff = diff >> 1;
+        this.diff = floor(diff / 2); // shift >> 1
         this.count = 1;
         if (hasCount) {
           this.count = readVarUint(this) + 2;
@@ -932,19 +1182,6 @@
   };
 
   /**
-   * Utility helpers for working with numbers.
-   *
-   * @module number
-   */
-
-  /**
-   * @module number
-   */
-
-  /* istanbul ignore next */
-  const isInteger = Number.isInteger || (num => typeof num === 'number' && isFinite(num) && floor(num) === num);
-
-  /**
    * Efficient schema-less binary encoding with support for variable length encoding.
    *
    * Use [lib0/encoding] with [lib0/decoding]. Every encoding function has a corresponding decoding function.
@@ -955,7 +1192,7 @@
    *
    * ```js
    * // encoding step
-   * const encoder = new encoding.createEncoder()
+   * const encoder = encoding.createEncoder()
    * encoding.writeVarUint(encoder, 256)
    * encoding.writeVarString(encoder, 'Hello world!')
    * const buf = encoding.toUint8Array(encoder)
@@ -963,7 +1200,7 @@
    *
    * ```js
    * // decoding step
-   * const decoder = new decoding.createDecoder(buf)
+   * const decoder = decoding.createDecoder(buf)
    * decoding.readVarUint(decoder) // => 256
    * decoding.readVarString(decoder) // => 'Hello world!'
    * decoding.hasContent(decoder) // => false - all data is read
@@ -999,7 +1236,7 @@
    * @param {Encoder} encoder
    * @return {number}
    */
-  const length = encoder => {
+  const length$1 = encoder => {
     let len = encoder.cpos;
     for (let i = 0; i < encoder.bufs.length; i++) {
       len += encoder.bufs[i].length;
@@ -1015,7 +1252,7 @@
    * @return {Uint8Array} The created ArrayBuffer.
    */
   const toUint8Array = encoder => {
-    const uint8arr = new Uint8Array(length(encoder));
+    const uint8arr = new Uint8Array(length$1(encoder));
     let curPos = 0;
     for (let i = 0; i < encoder.bufs.length; i++) {
       const d = encoder.bufs[i];
@@ -1069,9 +1306,7 @@
   const writeUint8 = write;
 
   /**
-   * Write a variable length unsigned integer.
-   *
-   * Encodes integers in the range from [0, 4294967295] / [0, 0xffffffff]. (max 32 bit unsigned integer)
+   * Write a variable length unsigned integer. Max encodable integer is 2^53.
    *
    * @function
    * @param {Encoder} encoder
@@ -1080,18 +1315,13 @@
   const writeVarUint = (encoder, num) => {
     while (num > BITS7) {
       write(encoder, BIT8 | (BITS7 & num));
-      num >>>= 7;
+      num = floor(num / 128); // shift >>> 7
     }
     write(encoder, BITS7 & num);
   };
 
   /**
    * Write a variable length integer.
-   *
-   * Encodes integers in the range from [-2147483648, -2147483647].
-   *
-   * We don't use zig-zag encoding because we want to keep the option open
-   * to use the same function for BigInt and 53bit integers (doubles).
    *
    * We use the 7th bit instead for signaling that this is a negative number.
    *
@@ -1106,12 +1336,39 @@
     }
     //             |- whether to continue reading         |- whether is negative     |- number
     write(encoder, (num > BITS6 ? BIT8 : 0) | (isNegative ? BIT7 : 0) | (BITS6 & num));
-    num >>>= 6;
+    num = floor(num / 64); // shift >>> 6
     // We don't need to consider the case of num === 0 so we can use a different
     // pattern here than above.
     while (num > 0) {
       write(encoder, (num > BITS7 ? BIT8 : 0) | (BITS7 & num));
-      num >>>= 7;
+      num = floor(num / 128); // shift >>> 7
+    }
+  };
+
+  /**
+   * A cache to store strings temporarily
+   */
+  const _strBuffer = new Uint8Array(30000);
+  const _maxStrBSize = _strBuffer.length / 3;
+
+  /**
+   * Write a variable length string.
+   *
+   * @function
+   * @param {Encoder} encoder
+   * @param {String} str The string that is to be encoded.
+   */
+  const _writeVarStringNative = (encoder, str) => {
+    if (str.length < _maxStrBSize) {
+      // We can encode the string into the existing buffer
+      /* c8 ignore next */
+      const written = utf8TextEncoder.encodeInto(str, _strBuffer).written || 0;
+      writeVarUint(encoder, written);
+      for (let i = 0; i < written; i++) {
+        write(encoder, _strBuffer[i]);
+      }
+    } else {
+      writeVarUint8Array(encoder, encodeUtf8(str));
     }
   };
 
@@ -1122,7 +1379,7 @@
    * @param {Encoder} encoder
    * @param {String} str The string that is to be encoded.
    */
-  const writeVarString = (encoder, str) => {
+  const _writeVarStringPolyfill = (encoder, str) => {
     const encodedString = unescape(encodeURIComponent(str));
     const len = encodedString.length;
     writeVarUint(encoder, len);
@@ -1130,6 +1387,16 @@
       write(encoder, /** @type {number} */ (encodedString.codePointAt(i)));
     }
   };
+
+  /**
+   * Write a variable length string.
+   *
+   * @function
+   * @param {Encoder} encoder
+   * @param {String} str The string that is to be encoded.
+   */
+  /* c8 ignore next */
+  const writeVarString = (utf8TextEncoder && /** @type {any} */ (utf8TextEncoder).encodeInto) ? _writeVarStringNative : _writeVarStringPolyfill;
 
   /**
    * Append fixed-length Uint8Array to the encoder.
@@ -1291,7 +1558,7 @@
         if (data === null) {
           // TYPE 126: null
           write(encoder, 126);
-        } else if (data instanceof Array) {
+        } else if (isArray(data)) {
           // TYPE 117: Array
           write(encoder, 117);
           writeVarUint(encoder, data.length);
@@ -1380,7 +1647,6 @@
    * @param {UintOptRleEncoder} encoder
    */
   const flushUintOptRleEncoder = encoder => {
-    /* istanbul ignore else */
     if (encoder.count > 0) {
       // flush counter, unless this is the first value (count = 0)
       // case 1: just a single value. set sign to positive
@@ -1435,7 +1701,8 @@
   const flushIntDiffOptRleEncoder = encoder => {
     if (encoder.count > 0) {
       //          31 bit making up the diff | wether to write the counter
-      const encodedDiff = encoder.diff << 1 | (encoder.count === 1 ? 0 : 1);
+      // const encodedDiff = encoder.diff << 1 | (encoder.count === 1 ? 0 : 1)
+      const encodedDiff = encoder.diff * 2 + (encoder.count === 1 ? 0 : 1);
       // flush counter, unless this is the first value (count = 0)
       // case 1: just a single value. set first bit to positive
       // case 2: write several values. set first bit to negative to indicate that there is a length coming
@@ -1538,32 +1805,9 @@
   }
 
   /* eslint-env browser */
-  const performance = typeof window === 'undefined' ? null : (typeof window.performance !== 'undefined' && window.performance) || null;
+  const getRandomValues = crypto.getRandomValues.bind(crypto);
 
-  const isoCrypto = typeof crypto === 'undefined' ? null : crypto;
-
-  /**
-   * @type {function(number):ArrayBuffer}
-   */
-  const cryptoRandomBuffer = isoCrypto !== null
-    ? len => {
-      // browser
-      const buf = new ArrayBuffer(len);
-      const arr = new Uint8Array(buf);
-      isoCrypto.getRandomValues(arr);
-      return buf
-    }
-    : len => {
-      // polyfill
-      const buf = new ArrayBuffer(len);
-      const arr = new Uint8Array(buf);
-      for (let i = 0; i < len; i++) {
-        arr[i] = Math.ceil((Math.random() * 0xFFFFFFFF) >>> 0);
-      }
-      return buf
-    };
-
-  const uint32 = () => new Uint32Array(cryptoRandomBuffer(4))[0];
+  const uint32 = () => getRandomValues(new Uint32Array(1))[0];
 
   // @ts-ignore
   const uuidv4Template = [1e7] + -1e3 + -4e3 + -8e3 + -1e11;
@@ -1631,7 +1875,7 @@
       return days + 'd' + ((hours > 0 || minutes > 30) ? ' ' + (minutes > 30 ? hours + 1 : hours) + 'h' : '')
     }
     if (hours > 0) {
-      /* istanbul ignore next */
+      /* c8 ignore next */
       return hours + 'h' + ((minutes > 0 || seconds > 30) ? ' ' + (seconds > 30 ? minutes + 1 : minutes) + 'min' : '')
     }
     return minutes + 'min' + (seconds > 0 ? ' ' + seconds + 's' : '')
@@ -1654,13 +1898,22 @@
    * @param {function(PromiseResolve<T>,function(Error):void):any} f
    * @return {Promise<T>}
    */
-  const create$2 = f => /** @type {Promise<T>} */ (new Promise(f));
+  const create$3 = f => /** @type {Promise<T>} */ (new Promise(f));
+
+  /**
+   * `Promise.all` wait for all promises in the array to resolve and return the result
+   * @template {unknown[] | []} PS
+   *
+   * @param {PS} ps
+   * @return {Promise<{ -readonly [P in keyof PS]: Awaited<PS[P]> }>}
+   */
+  const all = Promise.all.bind(Promise);
 
   /**
    * @param {number} timeout
    * @return {Promise<undefined>}
    */
-  const wait = timeout => create$2((resolve, reject) => setTimeout(resolve, timeout));
+  const wait = timeout => create$3((resolve, reject) => setTimeout(resolve, timeout));
 
   /**
    * Checks if an object is a promise using ducktyping.
@@ -1672,135 +1925,6 @@
    * @return {boolean}
    */
   const isPromise = p => p instanceof Promise || (p && p.then && p.catch && p.finally);
-
-  /**
-   * Error helpers.
-   *
-   * @module error
-   */
-
-  /* istanbul ignore next */
-  /**
-   * @param {string} s
-   * @return {Error}
-   */
-  const create$3 = s => new Error(s);
-
-  /* istanbul ignore next */
-  /**
-   * @throws {Error}
-   * @return {never}
-   */
-  const methodUnimplemented = () => {
-    throw create$3('Method unimplemented')
-  };
-
-  /* istanbul ignore next */
-  /**
-   * @throws {Error}
-   * @return {never}
-   */
-  const unexpectedCase = () => {
-    throw create$3('Unexpected case')
-  };
-
-  /**
-   * Utility functions for working with EcmaScript objects.
-   *
-   * @module object
-   */
-
-  /**
-   * @param {Object<string,any>} obj
-   */
-  const keys = Object.keys;
-
-  /**
-   * @template R
-   * @param {Object<string,any>} obj
-   * @param {function(any,string):R} f
-   * @return {Array<R>}
-   */
-  const map$1 = (obj, f) => {
-    const results = [];
-    for (const key in obj) {
-      results.push(f(obj[key], key));
-    }
-    return results
-  };
-
-  /**
-   * @param {Object<string,any>} obj
-   * @return {number}
-   */
-  const length$1 = obj => keys(obj).length;
-
-  /**
-   * @param {Object<string,any>} obj
-   * @param {function(any,string):boolean} f
-   * @return {boolean}
-   */
-  const every = (obj, f) => {
-    for (const key in obj) {
-      if (!f(obj[key], key)) {
-        return false
-      }
-    }
-    return true
-  };
-
-  /**
-   * Calls `Object.prototype.hasOwnProperty`.
-   *
-   * @param {any} obj
-   * @param {string|symbol} key
-   * @return {boolean}
-   */
-  const hasProperty = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
-
-  /**
-   * @param {Object<string,any>} a
-   * @param {Object<string,any>} b
-   * @return {boolean}
-   */
-  const equalFlat = (a, b) => a === b || (length$1(a) === length$1(b) && every(a, (val, key) => (val !== undefined || hasProperty(b, key)) && b[key] === val));
-
-  /**
-   * Common functions and function call helpers.
-   *
-   * @module function
-   */
-
-  /**
-   * Calls all functions in `fs` with args. Only throws after all functions were called.
-   *
-   * @param {Array<function>} fs
-   * @param {Array<any>} args
-   */
-  const callAll = (fs, args, i = 0) => {
-    try {
-      for (; i < fs.length; i++) {
-        fs[i](...args);
-      }
-    } finally {
-      if (i < fs.length) {
-        callAll(fs, args, i + 1);
-      }
-    }
-  };
-
-  /**
-   * Utility module to work with EcmaScript Symbols.
-   *
-   * @module symbol
-   */
-
-  /**
-   * Return fresh symbol.
-   *
-   * @return {Symbol}
-   */
-  const create$4 = Symbol;
 
   /**
    * Working with value pairs.
@@ -1828,18 +1952,18 @@
    * @param {R} right
    * @return {Pair<L,R>}
    */
-  const create$5 = (left, right) => new Pair(left, right);
+  const create$4 = (left, right) => new Pair(left, right);
 
   /**
    * @template L,R
    * @param {Array<Pair<L,R>>} arr
    * @param {function(L, R):any} f
    */
-  const forEach = (arr, f) => arr.forEach(p => f(p.left, p.right));
+  const forEach$1 = (arr, f) => arr.forEach(p => f(p.left, p.right));
 
   /* eslint-env browser */
 
-  /* istanbul ignore next */
+  /* c8 ignore start */
   /**
    * @type {Document}
    */
@@ -1849,23 +1973,19 @@
    * @param {string} name
    * @return {HTMLElement}
    */
-  /* istanbul ignore next */
   const createElement = name => doc.createElement(name);
 
   /**
    * @return {DocumentFragment}
    */
-  /* istanbul ignore next */
   const createDocumentFragment = () => doc.createDocumentFragment();
 
   /**
    * @param {string} text
    * @return {Text}
    */
-  /* istanbul ignore next */
   const createTextNode = text => doc.createTextNode(text);
 
-  /* istanbul ignore next */
   const domParser = /** @type {DOMParser} */ (typeof DOMParser !== 'undefined' ? new DOMParser() : null);
 
   /**
@@ -1873,9 +1993,8 @@
    * @param {Array<pair.Pair<string,string|boolean>>} attrs Array of key-value pairs
    * @return {Element}
    */
-  /* istanbul ignore next */
   const setAttributes = (el, attrs) => {
-    forEach(attrs, (key, value) => {
+    forEach$1(attrs, (key, value) => {
       if (value === false) {
         el.removeAttribute(key);
       } else if (value === true) {
@@ -1892,7 +2011,6 @@
    * @param {Array<Node>|HTMLCollection} children
    * @return {DocumentFragment}
    */
-  /* istanbul ignore next */
   const fragment = children => {
     const fragment = createDocumentFragment();
     for (let i = 0; i < children.length; i++) {
@@ -1906,7 +2024,6 @@
    * @param {Array<Node>} nodes
    * @return {Element}
    */
-  /* istanbul ignore next */
   const append = (parent, nodes) => {
     appendChild(parent, fragment(nodes));
     return parent
@@ -1917,7 +2034,6 @@
    * @param {string} name
    * @param {EventListener} f
    */
-  /* istanbul ignore next */
   const addEventListener$1 = (el, name, f) => el.addEventListener(name, f);
 
   /**
@@ -1926,7 +2042,6 @@
    * @param {Array<Node>} children
    * @return {Element}
    */
-  /* istanbul ignore next */
   const element = (name, attrs = [], children = []) =>
     append(setAttributes(createElement(name), attrs), children);
 
@@ -1934,14 +2049,12 @@
    * @param {string} t
    * @return {Text}
    */
-  /* istanbul ignore next */
   const text = createTextNode;
 
   /**
    * @param {Map<string,string>} m
    * @return {string}
    */
-  /* istanbul ignore next */
   const mapToStyleString = m => map(m, (value, key) => `${key}:${value};`).join('');
 
   /**
@@ -1949,8 +2062,8 @@
    * @param {Node} child
    * @return {Node}
    */
-  /* istanbul ignore next */
   const appendChild = (parent, child) => parent.appendChild(child);
+  /* c8 ignore stop */
 
   /**
    * JSON utility functions.
@@ -1997,54 +2110,74 @@
   };
 
   /**
+   * Utility module to work with EcmaScript Symbols.
+   *
+   * @module symbol
+   */
+
+  /**
+   * Return fresh symbol.
+   *
+   * @return {Symbol}
+   */
+  const create$5 = Symbol;
+
+  const BOLD = create$5();
+  const UNBOLD = create$5();
+  const BLUE = create$5();
+  const GREY = create$5();
+  const GREEN = create$5();
+  const RED = create$5();
+  const PURPLE = create$5();
+  const ORANGE = create$5();
+  const UNCOLOR = create$5();
+
+  /* c8 ignore start */
+  /**
+   * @param {Array<string|Symbol|Object|number>} args
+   * @return {Array<string|object|number>}
+   */
+  const computeNoColorLoggingArgs = args => {
+    const logArgs = [];
+    // try with formatting until we find something unsupported
+    let i = 0;
+    for (; i < args.length; i++) {
+      const arg = args[i];
+      if (arg.constructor === String || arg.constructor === Number) ; else if (arg.constructor === Object) {
+        logArgs.push(JSON.stringify(arg));
+      }
+    }
+    return logArgs
+  };
+  /* c8 ignore stop */
+
+  /**
    * Isomorphic logging module with support for colors!
    *
    * @module logging
    */
 
-  const BOLD = create$4();
-  const UNBOLD = create$4();
-  const BLUE = create$4();
-  const GREY = create$4();
-  const GREEN = create$4();
-  const RED = create$4();
-  const PURPLE = create$4();
-  const ORANGE = create$4();
-  const UNCOLOR = create$4();
-
   /**
    * @type {Object<Symbol,pair.Pair<string,string>>}
    */
   const _browserStyleMap = {
-    [BOLD]: create$5('font-weight', 'bold'),
-    [UNBOLD]: create$5('font-weight', 'normal'),
-    [BLUE]: create$5('color', 'blue'),
-    [GREEN]: create$5('color', 'green'),
-    [GREY]: create$5('color', 'grey'),
-    [RED]: create$5('color', 'red'),
-    [PURPLE]: create$5('color', 'purple'),
-    [ORANGE]: create$5('color', 'orange'), // not well supported in chrome when debugging node with inspector - TODO: deprecate
-    [UNCOLOR]: create$5('color', 'black')
+    [BOLD]: create$4('font-weight', 'bold'),
+    [UNBOLD]: create$4('font-weight', 'normal'),
+    [BLUE]: create$4('color', 'blue'),
+    [GREEN]: create$4('color', 'green'),
+    [GREY]: create$4('color', 'grey'),
+    [RED]: create$4('color', 'red'),
+    [PURPLE]: create$4('color', 'purple'),
+    [ORANGE]: create$4('color', 'orange'), // not well supported in chrome when debugging node with inspector - TODO: deprecate
+    [UNCOLOR]: create$4('color', 'black')
   };
 
-  const _nodeStyleMap = {
-    [BOLD]: '\u001b[1m',
-    [UNBOLD]: '\u001b[2m',
-    [BLUE]: '\x1b[34m',
-    [GREEN]: '\x1b[32m',
-    [GREY]: '\u001b[37m',
-    [RED]: '\x1b[31m',
-    [PURPLE]: '\x1b[35m',
-    [ORANGE]: '\x1b[38;5;208m',
-    [UNCOLOR]: '\x1b[0m'
-  };
-
-  /* istanbul ignore next */
   /**
    * @param {Array<string|Symbol|Object|number>} args
    * @return {Array<string|object|number>}
    */
-  const computeBrowserLoggingArgs = args => {
+  /* c8 ignore start */
+  const computeBrowserLoggingArgs = (args) => {
     const strBuilder = [];
     const styles = [];
     const currentStyle = create();
@@ -2054,7 +2187,6 @@
     let logArgs = [];
     // try with formatting until we find something unsupported
     let i = 0;
-
     for (; i < args.length; i++) {
       const arg = args[i];
       // @ts-ignore
@@ -2075,7 +2207,6 @@
         }
       }
     }
-
     if (i > 0) {
       // create logArgs with what we have so far
       logArgs = styles;
@@ -2090,96 +2221,66 @@
     }
     return logArgs
   };
+  /* c8 ignore stop */
 
-  /**
-   * @param {Array<string|Symbol|Object|number>} args
-   * @return {Array<string|object|number>}
-   */
-  const computeNodeLoggingArgs = args => {
-    const strBuilder = [];
-    const logArgs = [];
-
-    // try with formatting until we find something unsupported
-    let i = 0;
-
-    for (; i < args.length; i++) {
-      const arg = args[i];
-      // @ts-ignore
-      const style = _nodeStyleMap[arg];
-      if (style !== undefined) {
-        strBuilder.push(style);
-      } else {
-        if (arg.constructor === String || arg.constructor === Number) {
-          strBuilder.push(arg);
-        } else {
-          break
-        }
-      }
-    }
-    if (i > 0) {
-      // create logArgs with what we have so far
-      strBuilder.push('\x1b[0m');
-      logArgs.push(strBuilder.join(''));
-    }
-    // append the rest
-    for (; i < args.length; i++) {
-      const arg = args[i];
-      /* istanbul ignore else */
-      if (!(arg instanceof Symbol)) {
-        logArgs.push(arg);
-      }
-    }
-    return logArgs
-  };
-
-  /* istanbul ignore next */
-  const computeLoggingArgs = isNode ? computeNodeLoggingArgs : computeBrowserLoggingArgs;
+  /* c8 ignore start */
+  const computeLoggingArgs = supportsColor
+    ? computeBrowserLoggingArgs
+    : computeNoColorLoggingArgs;
+  /* c8 ignore stop */
 
   /**
    * @param {Array<string|Symbol|Object|number>} args
    */
   const print = (...args) => {
     console.log(...computeLoggingArgs(args));
-    /* istanbul ignore next */
-    vconsoles.forEach(vc => vc.print(args));
+    /* c8 ignore next */
+    vconsoles.forEach((vc) => vc.print(args));
   };
+  /* c8 ignore stop */
 
-  /* istanbul ignore next */
   /**
    * @param {Error} err
    */
-  const printError = err => {
+  /* c8 ignore start */
+  const printError = (err) => {
     console.error(err);
-    vconsoles.forEach(vc => vc.printError(err));
+    vconsoles.forEach((vc) => vc.printError(err));
   };
+  /* c8 ignore stop */
 
-  /* istanbul ignore next */
   /**
    * @param {string} url image location
    * @param {number} height height of the image in pixel
    */
+  /* c8 ignore start */
   const printImg = (url, height) => {
     if (isBrowser) {
-      console.log('%c                      ', `font-size: ${height}px; background-size: contain; background-repeat: no-repeat; background-image: url(${url})`);
+      console.log(
+        '%c                      ',
+        `font-size: ${height}px; background-size: contain; background-repeat: no-repeat; background-image: url(${url})`
+      );
       // console.log('%c                ', `font-size: ${height}x; background: url(${url}) no-repeat;`)
     }
-    vconsoles.forEach(vc => vc.printImg(url, height));
+    vconsoles.forEach((vc) => vc.printImg(url, height));
   };
+  /* c8 ignore stop */
 
-  /* istanbul ignore next */
   /**
    * @param {string} base64
    * @param {number} height
    */
-  const printImgBase64 = (base64, height) => printImg(`data:image/gif;base64,${base64}`, height);
+  /* c8 ignore next 2 */
+  const printImgBase64 = (base64, height) =>
+    printImg(`data:image/gif;base64,${base64}`, height);
 
   /**
    * @param {Array<string|Symbol|Object|number>} args
    */
   const group = (...args) => {
     console.group(...computeLoggingArgs(args));
-    /* istanbul ignore next */
-    vconsoles.forEach(vc => vc.group(args));
+    /* c8 ignore next */
+    vconsoles.forEach((vc) => vc.group(args));
   };
 
   /**
@@ -2187,24 +2288,24 @@
    */
   const groupCollapsed = (...args) => {
     console.groupCollapsed(...computeLoggingArgs(args));
-    /* istanbul ignore next */
-    vconsoles.forEach(vc => vc.groupCollapsed(args));
+    /* c8 ignore next */
+    vconsoles.forEach((vc) => vc.groupCollapsed(args));
   };
 
   const groupEnd = () => {
     console.groupEnd();
-    /* istanbul ignore next */
-    vconsoles.forEach(vc => vc.groupEnd());
+    /* c8 ignore next */
+    vconsoles.forEach((vc) => vc.groupEnd());
   };
 
-  const vconsoles = new Set();
+  const vconsoles = create$1();
 
-  /* istanbul ignore next */
   /**
    * @param {Array<string|Symbol|Object|number>} args
    * @return {Array<Element>}
    */
-  const _computeLineSpans = args => {
+  /* c8 ignore start */
+  const _computeLineSpans = (args) => {
     const spans = [];
     const currentStyle = new Map();
     // try with formatting until we find something unsupported
@@ -2218,7 +2319,9 @@
       } else {
         if (arg.constructor === String || arg.constructor === Number) {
           // @ts-ignore
-          const span = element('span', [create$5('style', mapToStyleString(currentStyle))], [text(arg)]);
+          const span = element('span', [
+            create$4('style', mapToStyleString(currentStyle))
+          ], [text(arg.toString())]);
           if (span.innerHTML === '') {
             span.innerHTML = '&nbsp;';
           }
@@ -2235,15 +2338,19 @@
         if (content.constructor !== String && content.constructor !== Number) {
           content = ' ' + stringify(content) + ' ';
         }
-        spans.push(element('span', [], [text(/** @type {string} */ (content))]));
+        spans.push(
+          element('span', [], [text(/** @type {string} */ (content))])
+        );
       }
     }
     return spans
   };
+  /* c8 ignore stop */
 
-  const lineStyle = 'font-family:monospace;border-bottom:1px solid #e2e2e2;padding:2px;';
+  const lineStyle =
+    'font-family:monospace;border-bottom:1px solid #e2e2e2;padding:2px;';
 
-  /* istanbul ignore next */
+  /* c8 ignore start */
   class VConsole {
     /**
      * @param {Element} dom
@@ -2264,16 +2371,33 @@
      */
     group (args, collapsed = false) {
       enqueue(() => {
-        const triangleDown = element('span', [create$5('hidden', collapsed), create$5('style', 'color:grey;font-size:120%;')], [text('▼')]);
-        const triangleRight = element('span', [create$5('hidden', !collapsed), create$5('style', 'color:grey;font-size:125%;')], [text('▶')]);
-        const content = element('div', [create$5('style', `${lineStyle};padding-left:${this.depth * 10}px`)], [triangleDown, triangleRight, text(' ')].concat(_computeLineSpans(args)));
-        const nextContainer = element('div', [create$5('hidden', collapsed)]);
+        const triangleDown = element('span', [
+          create$4('hidden', collapsed),
+          create$4('style', 'color:grey;font-size:120%;')
+        ], [text('▼')]);
+        const triangleRight = element('span', [
+          create$4('hidden', !collapsed),
+          create$4('style', 'color:grey;font-size:125%;')
+        ], [text('▶')]);
+        const content = element(
+          'div',
+          [create$4(
+            'style',
+            `${lineStyle};padding-left:${this.depth * 10}px`
+          )],
+          [triangleDown, triangleRight, text(' ')].concat(
+            _computeLineSpans(args)
+          )
+        );
+        const nextContainer = element('div', [
+          create$4('hidden', collapsed)
+        ]);
         const nextLine = element('div', [], [content, nextContainer]);
         append(this.ccontainer, [nextLine]);
         this.ccontainer = nextContainer;
         this.depth++;
         // when header is clicked, collapse/uncollapse container
-        addEventListener$1(content, 'click', event => {
+        addEventListener$1(content, 'click', (_event) => {
           nextContainer.toggleAttribute('hidden');
           triangleDown.toggleAttribute('hidden');
           triangleRight.toggleAttribute('hidden');
@@ -2303,7 +2427,14 @@
      */
     print (args) {
       enqueue(() => {
-        append(this.ccontainer, [element('div', [create$5('style', `${lineStyle};padding-left:${this.depth * 10}px`)], _computeLineSpans(args))]);
+        append(this.ccontainer, [
+          element('div', [
+            create$4(
+              'style',
+              `${lineStyle};padding-left:${this.depth * 10}px`
+            )
+          ], _computeLineSpans(args))
+        ]);
       });
     }
 
@@ -2320,7 +2451,12 @@
      */
     printImg (url, height) {
       enqueue(() => {
-        append(this.ccontainer, [element('img', [create$5('src', url), create$5('height', `${round(height * 1.5)}px`)])]);
+        append(this.ccontainer, [
+          element('img', [
+            create$4('src', url),
+            create$4('height', `${round(height * 1.5)}px`)
+          ])
+        ]);
       });
     }
 
@@ -2339,12 +2475,13 @@
       });
     }
   }
+  /* c8 ignore stop */
 
-  /* istanbul ignore next */
   /**
    * @param {Element} dom
    */
-  const createVConsole = dom => new VConsole(dom);
+  /* c8 ignore next */
+  const createVConsole = (dom) => new VConsole(dom);
 
   /**
    * Utility module to create and manipulate Iterators.
@@ -2548,7 +2685,7 @@
    * @function
    */
   const addToDeleteSet = (ds, client, clock, length) => {
-    setIfUndefined(ds.clients, client, () => []).push(new DeleteItem(clock, length));
+    setIfUndefined(ds.clients, client, () => /** @type {Array<DeleteItem>} */ ([])).push(new DeleteItem(clock, length));
   };
 
   const createDeleteSet = () => new DeleteSet();
@@ -2596,17 +2733,21 @@
    */
   const writeDeleteSet = (encoder, ds) => {
     writeVarUint(encoder.restEncoder, ds.clients.size);
-    ds.clients.forEach((dsitems, client) => {
-      encoder.resetDsCurVal();
-      writeVarUint(encoder.restEncoder, client);
-      const len = dsitems.length;
-      writeVarUint(encoder.restEncoder, len);
-      for (let i = 0; i < len; i++) {
-        const item = dsitems[i];
-        encoder.writeDsClock(item.clock);
-        encoder.writeDsLen(item.len);
-      }
-    });
+
+    // Ensure that the delete set is written in a deterministic order
+    from(ds.clients.entries())
+      .sort((a, b) => b[0] - a[0])
+      .forEach(([client, dsitems]) => {
+        encoder.resetDsCurVal();
+        writeVarUint(encoder.restEncoder, client);
+        const len = dsitems.length;
+        writeVarUint(encoder.restEncoder, len);
+        for (let i = 0; i < len; i++) {
+          const item = dsitems[i];
+          encoder.writeDsClock(item.clock);
+          encoder.writeDsLen(item.len);
+        }
+      });
   };
 
   /**
@@ -2624,7 +2765,7 @@
       const client = readVarUint(decoder.restDecoder);
       const numberOfDeletes = readVarUint(decoder.restDecoder);
       if (numberOfDeletes > 0) {
-        const dsField = setIfUndefined(ds.clients, client, () => []);
+        const dsField = setIfUndefined(ds.clients, client, () => /** @type {Array<DeleteItem>} */ ([]));
         for (let i = 0; i < numberOfDeletes; i++) {
           dsField.push(new DeleteItem(decoder.readDsClock(), decoder.readDsLen()));
         }
@@ -2725,7 +2866,7 @@
    */
   class Doc extends Observable {
     /**
-     * @param {DocOpts} [opts] configuration
+     * @param {DocOpts} opts configuration
      */
     constructor ({ guid = uuidv4(), collectionid = null, gc = true, gcFilter = () => true, meta = null, autoLoad = false, shouldLoad = true } = {}) {
       super();
@@ -2759,13 +2900,57 @@
       this.shouldLoad = shouldLoad;
       this.autoLoad = autoLoad;
       this.meta = meta;
+      /**
+       * This is set to true when the persistence provider loaded the document from the database or when the `sync` event fires.
+       * Note that not all providers implement this feature. Provider authors are encouraged to fire the `load` event when the doc content is loaded from the database.
+       *
+       * @type {boolean}
+       */
       this.isLoaded = false;
-      this.whenLoaded = create$2(resolve => {
+      /**
+       * This is set to true when the connection provider has successfully synced with a backend.
+       * Note that when using peer-to-peer providers this event may not provide very useful.
+       * Also note that not all providers implement this feature. Provider authors are encouraged to fire
+       * the `sync` event when the doc has been synced (with `true` as a parameter) or if connection is
+       * lost (with false as a parameter).
+       */
+      this.isSynced = false;
+      /**
+       * Promise that resolves once the document has been loaded from a presistence provider.
+       */
+      this.whenLoaded = create$3(resolve => {
         this.on('load', () => {
           this.isLoaded = true;
           resolve(this);
         });
       });
+      const provideSyncedPromise = () => create$3(resolve => {
+        /**
+         * @param {boolean} isSynced
+         */
+        const eventHandler = (isSynced) => {
+          if (isSynced === undefined || isSynced === true) {
+            this.off('sync', eventHandler);
+            resolve();
+          }
+        };
+        this.on('sync', eventHandler);
+      });
+      this.on('sync', isSynced => {
+        if (isSynced === false && this.isSynced) {
+          this.whenSynced = provideSyncedPromise();
+        }
+        this.isSynced = isSynced === undefined || isSynced === true;
+        if (!this.isLoaded) {
+          this.emit('load', []);
+        }
+      });
+      /**
+       * Promise that resolves once the document has been synced with a backend.
+       * This promise is recreated when the connection is lost.
+       * Note the documentation about the `isSynced` property.
+       */
+      this.whenSynced = provideSyncedPromise();
     }
 
     /**
@@ -2790,7 +2975,7 @@
     }
 
     getSubdocGuids () {
-      return new Set(Array.from(this.subdocs).map(doc => doc.guid))
+      return new Set(from(this.subdocs).map(doc => doc.guid))
     }
 
     /**
@@ -2799,13 +2984,15 @@
      * that happened inside of the transaction are sent as one message to the
      * other peers.
      *
-     * @param {function(Transaction):void} f The function that should be executed as a transaction
+     * @template T
+     * @param {function(Transaction):T} f The function that should be executed as a transaction
      * @param {any} [origin] Origin of who started the transaction. Will be stored on transaction.origin
+     * @return T
      *
      * @public
      */
     transact (f, origin = null) {
-      transact(this, f, origin);
+      return transact(this, f, origin)
     }
 
     /**
@@ -3607,7 +3794,7 @@
         sm.set(client, clock);
       }
     });
-    getStateVector(store).forEach((clock, client) => {
+    getStateVector(store).forEach((_clock, client) => {
       if (!_sm.has(client)) {
         sm.set(client, 0);
       }
@@ -3616,9 +3803,8 @@
     writeVarUint(encoder.restEncoder, sm.size);
     // Write items with higher client ids first
     // This heavily improves the conflict algorithm.
-    Array.from(sm.entries()).sort((a, b) => b[0] - a[0]).forEach(([client, clock]) => {
-      // @ts-ignore
-      writeStructs(encoder, store.clients.get(client), client, clock);
+    from(sm.entries()).sort((a, b) => b[0] - a[0]).forEach(([client, clock]) => {
+      writeStructs(encoder, /** @type {Array<GC|Item>} */ (store.clients.get(client)), client, clock);
     });
   };
 
@@ -3751,7 +3937,7 @@
      */
     const stack = [];
     // sort them so that we take the higher id first, in case of conflicts the lower id will probably not conflict with the id from the higher user.
-    let clientsStructRefsIds = Array.from(clientsStructRefs.keys()).sort((a, b) => a - b);
+    let clientsStructRefsIds = from(clientsStructRefs.keys()).sort((a, b) => a - b);
     if (clientsStructRefsIds.length === 0) {
       return null
     }
@@ -4258,7 +4444,7 @@
           getItemCleanStart(transaction, createID(client, clock));
         }
       });
-      iterateDeletedStructs(transaction, snapshot.ds, item => {});
+      iterateDeletedStructs(transaction, snapshot.ds, _item => {});
       meta.add(snapshot);
     }
   };
@@ -4708,7 +4894,6 @@
       try {
         sortAndMergeDeleteSet(ds);
         transaction.afterState = getStateVector(transaction.doc.store);
-        doc._transaction = null;
         doc.emit('beforeObserverCalls', [transaction, doc]);
         /**
          * An array of event callbacks.
@@ -4834,15 +5019,21 @@
   /**
    * Implements the functionality of `y.transact(()=>{..})`
    *
+   * @template T
    * @param {Doc} doc
-   * @param {function(Transaction):void} f
+   * @param {function(Transaction):T} f
    * @param {any} [origin=true]
+   * @return {T}
    *
    * @function
    */
   const transact = (doc, f, origin = null, local = true) => {
     const transactionCleanups = doc._transactionCleanups;
     let initialCall = false;
+    /**
+     * @type {any}
+     */
+    let result = null;
     if (doc._transaction === null) {
       initialCall = true;
       doc._transaction = new Transaction(doc, origin, local);
@@ -4853,20 +5044,25 @@
       doc.emit('beforeTransaction', [doc._transaction, doc]);
     }
     try {
-      f(doc._transaction);
+      result = f(doc._transaction);
     } finally {
-      if (initialCall && transactionCleanups[0] === doc._transaction) {
-        // The first transaction ended, now process observer calls.
-        // Observer call may create new transactions for which we need to call the observers and do cleanup.
-        // We don't want to nest these calls, so we execute these calls one after
-        // another.
-        // Also we need to ensure that all cleanups are called, even if the
-        // observes throw errors.
-        // This file is full of hacky try {} finally {} blocks to ensure that an
-        // event can throw errors and also that the cleanup is called.
-        cleanupTransactions(transactionCleanups, 0);
+      if (initialCall) {
+        const finishCleanup = doc._transaction === transactionCleanups[0];
+        doc._transaction = null;
+        if (finishCleanup) {
+          // The first transaction ended, now process observer calls.
+          // Observer call may create new transactions for which we need to call the observers and do cleanup.
+          // We don't want to nest these calls, so we execute these calls one after
+          // another.
+          // Also we need to ensure that all cleanups are called, even if the
+          // observes throw errors.
+          // This file is full of hacky try {} finally {} blocks to ensure that an
+          // event can throw errors and also that the cleanup is called.
+          cleanupTransactions(transactionCleanups, 0);
+        }
       }
     }
+    return result
   };
 
   /**
@@ -5246,17 +5442,17 @@
 
   /**
    * @param {Uint8Array} update
+   * @param {function(Item|GC|Skip):Item|GC|Skip} blockTransformer
    * @param {typeof UpdateDecoderV2 | typeof UpdateDecoderV1} YDecoder
    * @param {typeof UpdateEncoderV2 | typeof UpdateEncoderV1 } YEncoder
    */
-  const convertUpdateFormat = (update, YDecoder, YEncoder) => {
+  const convertUpdateFormat = (update, blockTransformer, YDecoder, YEncoder) => {
     const updateDecoder = new YDecoder(createDecoder(update));
     const lazyDecoder = new LazyStructReader(updateDecoder, false);
     const updateEncoder = new YEncoder();
     const lazyWriter = new LazyStructWriter(updateEncoder);
-
     for (let curr = lazyDecoder.curr; curr !== null; curr = lazyDecoder.next()) {
-      writeStructToLazyStructWriter(lazyWriter, curr, 0);
+      writeStructToLazyStructWriter(lazyWriter, blockTransformer(curr), 0);
     }
     finishLazyStructWriting(lazyWriter);
     const ds = readDeleteSet(updateDecoder);
@@ -5267,7 +5463,7 @@
   /**
    * @param {Uint8Array} update
    */
-  const convertUpdateFormatV2ToV1 = update => convertUpdateFormat(update, UpdateDecoderV2, UpdateEncoderV1);
+  const convertUpdateFormatV2ToV1 = update => convertUpdateFormat(update, id, UpdateDecoderV2, UpdateEncoderV1);
 
   /**
    * @template {AbstractType<any>} T
@@ -5392,6 +5588,11 @@
     }
 
     /**
+     * This is a computed property. Note that this can only be safely computed during the
+     * event call. Computing this property after other changes happened might result in
+     * unexpected behavior (incorrect computation of deltas). A safe way to collect changes
+     * is to store the `changes` or the `delta` object. Avoid storing the `transaction` object.
+     *
      * @type {Array<{insert?: string | Array<any> | object | AbstractType<any>, retain?: number, delete?: number, attributes?: Object<string, any>}>}
      */
     get delta () {
@@ -5411,6 +5612,11 @@
     }
 
     /**
+     * This is a computed property. Note that this can only be safely computed during the
+     * event call. Computing this property after other changes happened might result in
+     * unexpected behavior (incorrect computation of deltas). A safe way to collect changes
+     * is to store the `changes` or the `delta` object. Avoid storing the `transaction` object.
+     *
      * @type {{added:Set<Item>,deleted:Set<Item>,keys:Map<string,{action:'add'|'update'|'delete',oldValue:any}>,delta:Array<{insert?:Array<any>|string, delete?:number, retain?:number}>}}
      */
     get changes () {
@@ -5806,9 +6012,9 @@
     }
 
     /**
-     * @param {UpdateEncoderV1 | UpdateEncoderV2} encoder
+     * @param {UpdateEncoderV1 | UpdateEncoderV2} _encoder
      */
-    _write (encoder) { }
+    _write (_encoder) { }
 
     /**
      * The first non-deleted item
@@ -5826,9 +6032,9 @@
      * Must be implemented by each type.
      *
      * @param {Transaction} transaction
-     * @param {Set<null|string>} parentSubs Keys changed on this type. `null` if list was modified.
+     * @param {Set<null|string>} _parentSubs Keys changed on this type. `null` if list was modified.
      */
-    _callObserver (transaction, parentSubs) {
+    _callObserver (transaction, _parentSubs) {
       if (!transaction.local && this._searchMarker) {
         this._searchMarker.length = 0;
       }
@@ -6117,7 +6323,7 @@
     packJsonContent();
   };
 
-  const lengthExceeded = create$3('Length exceeded!');
+  const lengthExceeded = create$2('Length exceeded!');
 
   /**
    * @param {Transaction} transaction
@@ -6393,11 +6599,14 @@
 
     /**
      * Construct a new YArray containing the specified items.
-     * @template T
+     * @template {Object<string,any>|Array<any>|number|null|string|Uint8Array} T
      * @param {Array<T>} items
      * @return {YArray<T>}
      */
     static from (items) {
+      /**
+       * @type {YArray<T>}
+       */
       const a = new YArray();
       a.push(items);
       return a
@@ -6419,6 +6628,9 @@
       this._prelimContent = null;
     }
 
+    /**
+     * @return {YArray<T>}
+     */
     _copy () {
       return new YArray()
     }
@@ -6427,9 +6639,12 @@
      * @return {YArray<T>}
      */
     clone () {
+      /**
+       * @type {YArray<T>}
+       */
       const arr = new YArray();
       arr.insert(0, this.toArray().map(el =>
-        el instanceof AbstractType ? el.clone() : el
+        el instanceof AbstractType ? /** @type {typeof el} */ (el.clone()) : el
       ));
       return arr
     }
@@ -6468,7 +6683,7 @@
     insert (index, content) {
       if (this.doc !== null) {
         transact(this.doc, transaction => {
-          typeListInsertGenerics(transaction, this, index, content);
+          typeListInsertGenerics(transaction, this, index, /** @type {any} */ (content));
         });
       } else {
         /** @type {Array<any>} */ (this._prelimContent).splice(index, 0, ...content);
@@ -6485,7 +6700,7 @@
     push (content) {
       if (this.doc !== null) {
         transact(this.doc, transaction => {
-          typeListPushGenerics(transaction, this, content);
+          typeListPushGenerics(transaction, this, /** @type {any} */ (content));
         });
       } else {
         /** @type {Array<any>} */ (this._prelimContent).push(...content);
@@ -6570,7 +6785,7 @@
     }
 
     /**
-     * Executes a provided function on once on overy element of this YArray.
+     * Executes a provided function once on overy element of this YArray.
      *
      * @param {function(T,number,YArray<T>):void} f A function to execute on every element of this YArray.
      */
@@ -6594,12 +6809,12 @@
   }
 
   /**
-   * @param {UpdateDecoderV1 | UpdateDecoderV2} decoder
+   * @param {UpdateDecoderV1 | UpdateDecoderV2} _decoder
    *
    * @private
    * @function
    */
-  const readYArray = decoder => new YArray();
+  const readYArray = _decoder => new YArray();
 
   /**
    * @template T
@@ -6663,6 +6878,9 @@
       this._prelimContent = null;
     }
 
+    /**
+     * @return {YMap<MapType>}
+     */
     _copy () {
       return new YMap()
     }
@@ -6671,9 +6889,12 @@
      * @return {YMap<MapType>}
      */
     clone () {
+      /**
+       * @type {YMap<MapType>}
+       */
       const map = new YMap();
       this.forEach((value, key) => {
-        map.set(key, value instanceof AbstractType ? value.clone() : value);
+        map.set(key, value instanceof AbstractType ? /** @type {typeof value} */ (value.clone()) : value);
       });
       return map
     }
@@ -6749,16 +6970,11 @@
      * @param {function(MapType,string,YMap<MapType>):void} f A function to execute on every element of this YArray.
      */
     forEach (f) {
-      /**
-       * @type {Object<string,MapType>}
-       */
-      const map = {};
       this._map.forEach((item, key) => {
         if (!item.deleted) {
           f(item.content.getContent()[item.length - 1], key, this);
         }
       });
-      return map
     }
 
     /**
@@ -6787,14 +7003,16 @@
 
     /**
      * Adds or updates an element with a specified key and value.
+     * @template {MapType} VAL
      *
      * @param {string} key The key of the element to add to this YMap
-     * @param {MapType} value The value of the element to add
+     * @param {VAL} value The value of the element to add
+     * @return {VAL}
      */
     set (key, value) {
       if (this.doc !== null) {
         transact(this.doc, transaction => {
-          typeMapSet(transaction, this, key, value);
+          typeMapSet(transaction, this, key, /** @type {any} */ (value));
         });
       } else {
         /** @type {Map<string, any>} */ (this._prelimContent).set(key, value);
@@ -6828,7 +7046,7 @@
     clear () {
       if (this.doc !== null) {
         transact(this.doc, transaction => {
-          this.forEach(function (value, key, map) {
+          this.forEach(function (_value, key, map) {
             typeMapDelete(transaction, map, key);
           });
         });
@@ -6846,12 +7064,12 @@
   }
 
   /**
-   * @param {UpdateDecoderV1 | UpdateDecoderV2} decoder
+   * @param {UpdateDecoderV1 | UpdateDecoderV2} _decoder
    *
    * @private
    * @function
    */
-  const readYMap = decoder => new YMap();
+  const readYMap = _decoder => new YMap();
 
   /**
    * @param {any} a
@@ -7068,7 +7286,7 @@
    * @function
    **/
   const insertText = (transaction, parent, currPos, text, attributes) => {
-    currPos.currentAttributes.forEach((val, key) => {
+    currPos.currentAttributes.forEach((_val, key) => {
       if (attributes[key] === undefined) {
         attributes[key] = null;
       }
@@ -7180,32 +7398,47 @@
    * @function
    */
   const cleanupFormattingGap = (transaction, start, curr, startAttributes, currAttributes) => {
-    let end = curr;
-    const endAttributes = copy(currAttributes);
+    /**
+     * @type {Item|null}
+     */
+    let end = start;
+    /**
+     * @type {Map<string,ContentFormat>}
+     */
+    const endFormats = create();
     while (end && (!end.countable || end.deleted)) {
       if (!end.deleted && end.content.constructor === ContentFormat) {
-        updateCurrentAttributes(endAttributes, /** @type {ContentFormat} */ (end.content));
+        const cf = /** @type {ContentFormat} */ (end.content);
+        endFormats.set(cf.key, cf);
       }
       end = end.right;
     }
     let cleanups = 0;
-    let reachedEndOfCurr = false;
+    let reachedCurr = false;
     while (start !== end) {
       if (curr === start) {
-        reachedEndOfCurr = true;
+        reachedCurr = true;
       }
       if (!start.deleted) {
         const content = start.content;
         switch (content.constructor) {
           case ContentFormat: {
             const { key, value } = /** @type {ContentFormat} */ (content);
-            if ((endAttributes.get(key) || null) !== value || (startAttributes.get(key) || null) === value) {
+            const startAttrValue = startAttributes.get(key) || null;
+            if (endFormats.get(key) !== content || startAttrValue === value) {
               // Either this format is overwritten or it is not necessary because the attribute already existed.
               start.delete(transaction);
               cleanups++;
-              if (!reachedEndOfCurr && (currAttributes.get(key) || null) === value && (startAttributes.get(key) || null) !== value) {
-                currAttributes.delete(key);
+              if (!reachedCurr && (currAttributes.get(key) || null) === value && startAttrValue !== value) {
+                if (startAttrValue === null) {
+                  currAttributes.delete(key);
+                } else {
+                  currAttributes.set(key, startAttrValue);
+                }
               }
+            }
+            if (!reachedCurr && !start.deleted) {
+              updateCurrentAttributes(currAttributes, /** @type {ContentFormat} */ (content));
             }
             break
           }
@@ -7433,36 +7666,39 @@
               /**
                * @type {any}
                */
-              let op;
+              let op = null;
               switch (action) {
                 case 'delete':
-                  op = { delete: deleteLen };
+                  if (deleteLen > 0) {
+                    op = { delete: deleteLen };
+                  }
                   deleteLen = 0;
                   break
                 case 'insert':
-                  op = { insert };
-                  if (currentAttributes.size > 0) {
-                    op.attributes = {};
-                    currentAttributes.forEach((value, key) => {
-                      if (value !== null) {
-                        op.attributes[key] = value;
-                      }
-                    });
+                  if (typeof insert === 'object' || insert.length > 0) {
+                    op = { insert };
+                    if (currentAttributes.size > 0) {
+                      op.attributes = {};
+                      currentAttributes.forEach((value, key) => {
+                        if (value !== null) {
+                          op.attributes[key] = value;
+                        }
+                      });
+                    }
                   }
                   insert = '';
                   break
                 case 'retain':
-                  op = { retain };
-                  if (Object.keys(attributes).length > 0) {
-                    op.attributes = {};
-                    for (const key in attributes) {
-                      op.attributes[key] = attributes[key];
+                  if (retain > 0) {
+                    op = { retain };
+                    if (!isEmpty(attributes)) {
+                      op.attributes = assign({}, attributes);
                     }
                   }
                   retain = 0;
                   break
               }
-              delta.push(op);
+              if (op) delta.push(op);
               action = null;
             }
           };
@@ -7744,7 +7980,7 @@
      * Apply a {@link Delta} on this shared YText type.
      *
      * @param {any} delta The changes to apply on this element.
-     * @param {object}  [opts]
+     * @param {object}  opts
      * @param {boolean} [opts.sanitize] Sanitize input delta. Removes ending newlines if set to true.
      *
      *
@@ -7820,27 +8056,19 @@
           str = '';
         }
       }
-      // snapshots are merged again after the transaction, so we need to keep the
-      // transalive until we are done
-      transact(doc, transaction => {
-        if (snapshot) {
-          splitSnapshotAffectedStructs(transaction, snapshot);
-        }
-        if (prevSnapshot) {
-          splitSnapshotAffectedStructs(transaction, prevSnapshot);
-        }
+      const computeDelta = () => {
         while (n !== null) {
           if (isVisible(n, snapshot) || (prevSnapshot !== undefined && isVisible(n, prevSnapshot))) {
             switch (n.content.constructor) {
               case ContentString: {
                 const cur = currentAttributes.get('ychange');
                 if (snapshot !== undefined && !isVisible(n, snapshot)) {
-                  if (cur === undefined || cur.user !== n.id.client || cur.state !== 'removed') {
+                  if (cur === undefined || cur.user !== n.id.client || cur.type !== 'removed') {
                     packStr();
                     currentAttributes.set('ychange', computeYChange ? computeYChange('removed', n.id) : { type: 'removed' });
                   }
                 } else if (prevSnapshot !== undefined && !isVisible(n, prevSnapshot)) {
-                  if (cur === undefined || cur.user !== n.id.client || cur.state !== 'added') {
+                  if (cur === undefined || cur.user !== n.id.client || cur.type !== 'added') {
                     packStr();
                     currentAttributes.set('ychange', computeYChange ? computeYChange('added', n.id) : { type: 'added' });
                   }
@@ -7881,7 +8109,22 @@
           n = n.right;
         }
         packStr();
-      }, splitSnapshotAffectedStructs);
+      };
+      if (snapshot || prevSnapshot) {
+        // snapshots are merged again after the transaction, so we need to keep the
+        // transaction alive until we are done
+        transact(doc, transaction => {
+          if (snapshot) {
+            splitSnapshotAffectedStructs(transaction, snapshot);
+          }
+          if (prevSnapshot) {
+            splitSnapshotAffectedStructs(transaction, prevSnapshot);
+          }
+          computeDelta();
+        }, 'cleanup');
+      } else {
+        computeDelta();
+      }
       return ops
     }
 
@@ -8046,12 +8289,11 @@
      *
      * @note Xml-Text nodes don't have attributes. You can use this feature to assign properties to complete text-blocks.
      *
-     * @param {Snapshot} [snapshot]
      * @return {Object<string, any>} A JSON Object that describes the attributes.
      *
      * @public
      */
-    getAttributes (snapshot) {
+    getAttributes () {
       return typeMapGetAll(this)
     }
 
@@ -8064,13 +8306,13 @@
   }
 
   /**
-   * @param {UpdateDecoderV1 | UpdateDecoderV2} decoder
+   * @param {UpdateDecoderV1 | UpdateDecoderV2} _decoder
    * @return {YText}
    *
    * @private
    * @function
    */
-  const readYText = decoder => new YText();
+  const readYText = _decoder => new YText();
 
   /**
    * @module YXml
@@ -8291,7 +8533,7 @@
     querySelectorAll (query) {
       query = query.toUpperCase();
       // @ts-ignore
-      return Array.from(new YXmlTreeWalker(this, element => element.nodeName && element.nodeName.toUpperCase() === query))
+      return from(new YXmlTreeWalker(this, element => element.nodeName && element.nodeName.toUpperCase() === query))
     }
 
     /**
@@ -8387,7 +8629,7 @@
         const pc = /** @type {Array<any>} */ (this._prelimContent);
         const index = ref === null ? 0 : pc.findIndex(el => el === ref) + 1;
         if (index === 0 && ref !== null) {
-          throw create$3('Reference item not found')
+          throw create$2('Reference item not found')
         }
         pc.splice(index, 0, ...content);
       }
@@ -8461,7 +8703,7 @@
     /**
      * Executes a provided function on once on overy child element.
      *
-     * @param {function(YXmlElement|YXmlText,number, typeof this):void} f A function to execute on every element of this YArray.
+     * @param {function(YXmlElement|YXmlText,number, typeof self):void} f A function to execute on every element of this YArray.
      */
     forEach (f) {
       typeListForEach(this, f);
@@ -8481,13 +8723,17 @@
   }
 
   /**
-   * @param {UpdateDecoderV1 | UpdateDecoderV2} decoder
+   * @param {UpdateDecoderV1 | UpdateDecoderV2} _decoder
    * @return {YXmlFragment}
    *
    * @private
    * @function
    */
-  const readYXmlFragment = decoder => new YXmlFragment();
+  const readYXmlFragment = _decoder => new YXmlFragment();
+
+  /**
+   * @typedef {Object|number|null|Array<any>|string|Uint8Array|AbstractType<any>} ValueTypes
+   */
 
   /**
    * An YXmlElement imitates the behavior of a
@@ -8495,6 +8741,8 @@
    *
    * * An YXmlElement has attributes (key value pairs)
    * * An YXmlElement has childElements that must inherit from YXmlElement
+   *
+   * @template {{ [key: string]: ValueTypes }} [KV={ [key: string]: string }]
    */
   class YXmlElement extends YXmlFragment {
     constructor (nodeName = 'UNDEFINED') {
@@ -8550,14 +8798,19 @@
     }
 
     /**
-     * @return {YXmlElement}
+     * @return {YXmlElement<KV>}
      */
     clone () {
+      /**
+       * @type {YXmlElement<KV>}
+       */
       const el = new YXmlElement(this.nodeName);
       const attrs = this.getAttributes();
-      for (const key in attrs) {
-        el.setAttribute(key, attrs[key]);
-      }
+      forEach(attrs, (value, key) => {
+        if (typeof value === 'string') {
+          el.setAttribute(key, value);
+        }
+      });
       // @ts-ignore
       el.insert(0, this.toArray().map(item => item instanceof AbstractType ? item.clone() : item));
       return el
@@ -8593,7 +8846,7 @@
     /**
      * Removes an attribute from this YXmlElement.
      *
-     * @param {String} attributeName The attribute name that is to be removed.
+     * @param {string} attributeName The attribute name that is to be removed.
      *
      * @public
      */
@@ -8610,8 +8863,10 @@
     /**
      * Sets or updates an attribute.
      *
-     * @param {String} attributeName The attribute name that is to be set.
-     * @param {String} attributeValue The attribute value that is to be set.
+     * @template {keyof KV & string} KEY
+     *
+     * @param {KEY} attributeName The attribute name that is to be set.
+     * @param {KV[KEY]} attributeValue The attribute value that is to be set.
      *
      * @public
      */
@@ -8628,9 +8883,11 @@
     /**
      * Returns an attribute value that belongs to the attribute name.
      *
-     * @param {String} attributeName The attribute name that identifies the
+     * @template {keyof KV & string} KEY
+     *
+     * @param {KEY} attributeName The attribute name that identifies the
      *                               queried value.
-     * @return {String} The queried attribute value.
+     * @return {KV[KEY]|undefined} The queried attribute value.
      *
      * @public
      */
@@ -8641,7 +8898,7 @@
     /**
      * Returns whether an attribute exists
      *
-     * @param {String} attributeName The attribute name to check for existence.
+     * @param {string} attributeName The attribute name to check for existence.
      * @return {boolean} whether the attribute exists.
      *
      * @public
@@ -8653,13 +8910,12 @@
     /**
      * Returns all attribute name/value pairs in a JSON Object.
      *
-     * @param {Snapshot} [snapshot]
-     * @return {Object<string, any>} A JSON Object that describes the attributes.
+     * @return {{ [Key in Extract<keyof KV,string>]?: KV[Key]}} A JSON Object that describes the attributes.
      *
      * @public
      */
-    getAttributes (snapshot) {
-      return typeMapGetAll(this)
+    getAttributes () {
+      return /** @type {any} */ (typeMapGetAll(this))
     }
 
     /**
@@ -8681,7 +8937,10 @@
       const dom = _document.createElement(this.nodeName);
       const attrs = this.getAttributes();
       for (const key in attrs) {
-        dom.setAttribute(key, attrs[key]);
+        const value = attrs[key];
+        if (typeof value === 'string') {
+          dom.setAttribute(key, value);
+        }
       }
       typeListForEach(this, yxml => {
         dom.appendChild(yxml.toDOM(_document, hooks, binding));
@@ -10633,10 +10892,12 @@
 
   /** eslint-env browser */
 
-  const glo = /** @type {any} */ (typeof window !== 'undefined'
-    ? window
-    // @ts-ignore
-    : typeof global !== 'undefined' ? global : {});
+  const glo = /** @type {any} */ (typeof globalThis !== 'undefined'
+    ? globalThis
+    : typeof window !== 'undefined'
+      ? window
+      // @ts-ignore
+      : typeof global !== 'undefined' ? global : {});
 
   const importIdentifier = '__ $YJS$ __';
 
@@ -10652,50 +10913,45 @@
      * This often leads to issues that are hard to debug. We often need to perform constructor checks,
      * e.g. `struct instanceof GC`. If you imported different versions of Yjs, it is impossible for us to
      * do the constructor checks anymore - which might break the CRDT algorithm.
+     *
+     * https://github.com/yjs/yjs/issues/438
      */
-    console.error('Yjs was already imported. This breaks constructor checks and will lead to isssues!');
+    console.error('Yjs was already imported. This breaks constructor checks and will lead to issues! - https://github.com/yjs/yjs/issues/438');
   }
   glo[importIdentifier] = true;
 
   /* eslint-env browser */
 
-  /* istanbul ignore next */
+  /* c8 ignore start */
+
   /**
    * IDB Request to Promise transformer
    *
    * @param {IDBRequest} request
    * @return {Promise<any>}
    */
-  const rtop = request => create$2((resolve, reject) => {
-    /* istanbul ignore next */
+  const rtop = request => create$3((resolve, reject) => {
     // @ts-ignore
     request.onerror = event => reject(new Error(event.target.error));
-    /* istanbul ignore next */
-    // @ts-ignore
-    request.onblocked = () => location.reload();
     // @ts-ignore
     request.onsuccess = event => resolve(event.target.result);
   });
 
-  /* istanbul ignore next */
   /**
    * @param {string} name
    * @param {function(IDBDatabase):any} initDB Called when the database is first created
    * @return {Promise<IDBDatabase>}
    */
-  const openDB = (name, initDB) => create$2((resolve, reject) => {
+  const openDB = (name, initDB) => create$3((resolve, reject) => {
     const request = indexedDB.open(name);
     /**
      * @param {any} event
      */
     request.onupgradeneeded = event => initDB(event.target.result);
-    /* istanbul ignore next */
     /**
      * @param {any} event
      */
-    request.onerror = event => reject(create$3(event.target.error));
-    /* istanbul ignore next */
-    request.onblocked = () => location.reload();
+    request.onerror = event => reject(create$2(event.target.error));
     /**
      * @param {any} event
      */
@@ -10704,9 +10960,7 @@
        * @type {IDBDatabase}
        */
       const db = event.target.result;
-      /* istanbul ignore next */
       db.onversionchange = () => { db.close(); };
-      /* istanbul ignore if */
       if (typeof addEventListener !== 'undefined') {
         addEventListener('unload', () => db.close());
       }
@@ -10714,13 +10968,11 @@
     };
   });
 
-  /* istanbul ignore next */
   /**
    * @param {string} name
    */
   const deleteDB = name => rtop(indexedDB.deleteDatabase(name));
 
-  /* istanbul ignore next */
   /**
    * @param {IDBDatabase} db
    * @param {Array<Array<string>|Array<string|IDBObjectStoreParameters|undefined>>} definitions
@@ -10741,7 +10993,6 @@
     return stores.map(store => getStore(transaction, store))
   };
 
-  /* istanbul ignore next */
   /**
    * @param {IDBObjectStore} store
    * @param {IDBKeyRange} [range]
@@ -10750,7 +11001,6 @@
   const count = (store, range) =>
     rtop(store.count(range));
 
-  /* istanbul ignore next */
   /**
    * @param {IDBObjectStore} store
    * @param {String | number | ArrayBuffer | Date | Array<any> } key
@@ -10759,7 +11009,6 @@
   const get = (store, key) =>
     rtop(store.get(key));
 
-  /* istanbul ignore next */
   /**
    * @param {IDBObjectStore} store
    * @param {String | number | ArrayBuffer | Date | IDBKeyRange | Array<any> } key
@@ -10767,7 +11016,6 @@
   const del = (store, key) =>
     rtop(store.delete(key));
 
-  /* istanbul ignore next */
   /**
    * @param {IDBObjectStore} store
    * @param {String | number | ArrayBuffer | Date | boolean} item
@@ -10776,7 +11024,6 @@
   const put = (store, item, key) =>
     rtop(store.put(item, key));
 
-  /* istanbul ignore next */
   /**
    * @param {IDBObjectStore} store
    * @param {String | number | ArrayBuffer | Date}  item
@@ -10785,14 +11032,14 @@
   const addAutoKey = (store, item) =>
     rtop(store.add(item));
 
-  /* istanbul ignore next */
   /**
    * @param {IDBObjectStore} store
    * @param {IDBKeyRange} [range]
+   * @param {number} [limit]
    * @return {Promise<Array<any>>}
    */
-  const getAll = (store, range) =>
-    rtop(store.getAll(range));
+  const getAll = (store, range, limit) =>
+    rtop(store.getAll(range, limit));
 
   /**
    * @param {IDBObjectStore} store
@@ -10818,40 +11065,36 @@
    */
   const getLastKey = (store, range = null) => queryFirst(store, range, 'prev');
 
-  /* istanbul ignore next */
   /**
    * @param {any} request
-   * @param {function(IDBCursorWithValue):void|boolean} f
+   * @param {function(IDBCursorWithValue):void|boolean|Promise<void|boolean>} f
    * @return {Promise<void>}
    */
-  const iterateOnRequest = (request, f) => create$2((resolve, reject) => {
-    /* istanbul ignore next */
+  const iterateOnRequest = (request, f) => create$3((resolve, reject) => {
     request.onerror = reject;
     /**
      * @param {any} event
      */
-    request.onsuccess = event => {
+    request.onsuccess = async event => {
       const cursor = event.target.result;
-      if (cursor === null || f(cursor) === false) {
+      if (cursor === null || (await f(cursor)) === false) {
         return resolve()
       }
       cursor.continue();
     };
   });
 
-  /* istanbul ignore next */
   /**
    * Iterate on the keys (no values)
    *
    * @param {IDBObjectStore} store
    * @param {IDBKeyRange|null} keyrange
-   * @param {function(any):void|boolean} f callback that receives the key
+   * @param {function(any):void|boolean|Promise<void|boolean>} f callback that receives the key
    * @param {'next'|'prev'|'nextunique'|'prevunique'} direction
    */
   const iterateKeys = (store, keyrange, f, direction = 'next') =>
     iterateOnRequest(store.openKeyCursor(keyrange, direction), cursor => f(cursor.key));
 
-  /* istanbul ignore next */
   /**
    * Open store from transaction
    * @param {IDBTransaction} t
@@ -10860,19 +11103,19 @@
    */
   const getStore = (t, store) => t.objectStore(store);
 
-  /* istanbul ignore next */
   /**
    * @param {any} upper
    * @param {boolean} upperOpen
    */
   const createIDBKeyRangeUpperBound = (upper, upperOpen) => IDBKeyRange.upperBound(upper, upperOpen);
 
-  /* istanbul ignore next */
   /**
    * @param {any} lower
    * @param {boolean} lowerOpen
    */
   const createIDBKeyRangeLowerBound = (lower, lowerOpen) => IDBKeyRange.lowerBound(lower, lowerOpen);
+
+  /* c8 ignore stop */
 
   const customStoreName = 'custom';
   const updatesStoreName = 'updates';
@@ -11214,7 +11457,6 @@
    * @typedef {Object} PRNG
    * @property {generatorNext} next Generate new number
    */
-
   const DefaultPRNG = Xoroshiro128plus;
 
   /**
@@ -11226,6 +11468,7 @@
    * @return {PRNG}
    */
   const create$6 = seed => new DefaultPRNG(seed);
+  /* c8 ignore stop */
 
   /**
    * Utility helpers for generating statistics.
@@ -11245,13 +11488,19 @@
    */
   const average = arr => arr.reduce(add, 0) / arr.length;
 
+  /* eslint-env browser */
+
+  const measure = performance.measure.bind(performance);
+  const now = performance.now.bind(performance);
+  const mark = performance.mark.bind(performance);
+
   /**
    * Testing framework with support for generating tests.
    *
    * ```js
    * // test.js template for creating a test executable
-   * import { runTests } from 'lib0/testing.js'
-   * import * as log from 'lib0/logging.js'
+   * import { runTests } from 'lib0/testing'
+   * import * as log from 'lib0/logging'
    * import * as mod1 from './mod1.test.js'
    * import * as mod2 from './mod2.test.js'
 
@@ -11292,7 +11541,7 @@
 
   const extensive = hasConf('extensive');
 
-  /* istanbul ignore next */
+  /* c8 ignore next */
   const envSeed = hasParam('--seed') ? Number.parseInt(getParam('--seed', '0')) : null;
 
   class TestCase {
@@ -11321,11 +11570,11 @@
     /**
      * @type {number}
      */
-    /* istanbul ignore next */
+    /* c8 ignore next */
     get seed () {
-      /* istanbul ignore else */
+      /* c8 ignore else */
       if (this._seed === null) {
-        /* istanbul ignore next */
+        /* c8 ignore next */
         this._seed = envSeed === null ? uint32() : envSeed;
       }
       return this._seed
@@ -11337,7 +11586,7 @@
      * @type {prng.PRNG}
      */
     get prng () {
-      /* istanbul ignore else */
+      /* c8 ignore else */
       if (this._prng === null) {
         this._prng = create$6(this.seed);
       }
@@ -11346,10 +11595,10 @@
   }
 
   const repetitionTime = Number(getParam('--repetition-time', '50'));
-  /* istanbul ignore next */
+  /* c8 ignore next */
   const testFilter = hasParam('--filter') ? getParam('--filter', '') : null;
 
-  /* istanbul ignore next */
+  /* c8 ignore next */
   const testFilterRegExp = testFilter !== null ? new RegExp(testFilter) : new RegExp('.*');
 
   const repeatTestRegex = /^(repeat|repeating)\s/;
@@ -11364,27 +11613,27 @@
   const run = async (moduleName, name, f, i, numberOfTests) => {
     const uncamelized = fromCamelCase(name.slice(4), ' ');
     const filtered = !testFilterRegExp.test(`[${i + 1}/${numberOfTests}] ${moduleName}: ${uncamelized}`);
-    /* istanbul ignore if */
+    /* c8 ignore next 3 */
     if (filtered) {
       return true
     }
     const tc = new TestCase(moduleName, name);
     const repeat = repeatTestRegex.test(uncamelized);
     const groupArgs = [GREY, `[${i + 1}/${numberOfTests}] `, PURPLE, `${moduleName}: `, BLUE, uncamelized];
-    /* istanbul ignore next */
+    /* c8 ignore next 5 */
     if (testFilter === null) {
       groupCollapsed(...groupArgs);
     } else {
       group(...groupArgs);
     }
     const times = [];
-    const start = performance.now();
+    const start = now();
     let lastTime = start;
     /**
      * @type {any}
      */
     let err = null;
-    performance.mark(`${name}-start`);
+    mark(`${name}-start`);
     do {
       try {
         const p = f(tc);
@@ -11394,7 +11643,7 @@
       } catch (_err) {
         err = _err;
       }
-      const currTime = performance.now();
+      const currTime = now();
       times.push(currTime - lastTime);
       lastTime = currTime;
       if (repeat && err === null && (lastTime - start) < repetitionTime) {
@@ -11403,31 +11652,32 @@
         break
       }
     } while (err === null && (lastTime - start) < repetitionTime)
-    performance.mark(`${name}-end`);
-    /* istanbul ignore if */
+    mark(`${name}-end`);
+    /* c8 ignore next 3 */
     if (err !== null && err.constructor !== SkipError) {
       printError(err);
     }
-    performance.measure(name, `${name}-start`, `${name}-end`);
+    measure(name, `${name}-start`, `${name}-end`);
     groupEnd();
     const duration = lastTime - start;
     let success = true;
     times.sort((a, b) => a - b);
-    /* istanbul ignore next */
+    /* c8 ignore next 3 */
     const againMessage = isBrowser
-      ? `     - ${window.location.href}?filter=\\[${i + 1}/${tc._seed === null ? '' : `&seed=${tc._seed}`}`
+      ? `     - ${window.location.host + window.location.pathname}?filter=\\[${i + 1}/${tc._seed === null ? '' : `&seed=${tc._seed}`}`
       : `\nrepeat: npm run test -- --filter "\\[${i + 1}/" ${tc._seed === null ? '' : `--seed ${tc._seed}`}`;
     const timeInfo = (repeat && err === null)
       ? ` - ${times.length} repetitions in ${humanizeDuration(duration)} (best: ${humanizeDuration(times[0])}, worst: ${humanizeDuration(last(times))}, median: ${humanizeDuration(median(times))}, average: ${humanizeDuration(average(times))})`
       : ` in ${humanizeDuration(duration)}`;
     if (err !== null) {
-      /* istanbul ignore else */
+      /* c8 ignore start */
       if (err.constructor === SkipError) {
         print(GREY, BOLD, 'Skipped: ', UNBOLD, uncamelized);
       } else {
         success = false;
         print(RED, BOLD, 'Failure: ', UNBOLD, UNCOLOR, uncamelized, GREY, timeInfo, againMessage);
       }
+      /* c8 ignore stop */
     } else {
       print(GREEN, BOLD, 'Success: ', UNBOLD, UNCOLOR, uncamelized, GREY, timeInfo, againMessage);
     }
@@ -11462,54 +11712,59 @@
    */
   const compareObjects = (a, b, m = 'Objects match') => { equalFlat(a, b) || fail(m); };
 
-  /* istanbul ignore next */
   /**
-   * @param {boolean} condition
+   * @template T
+   * @param {T} property
    * @param {string?} [message]
+   * @return {asserts property is NonNullable<T>}
    * @throws {TestError}
    */
-  const assert = (condition, message = null) => condition || fail(`Assertion failed${message !== null ? `: ${message}` : ''}`);
+  /* c8 ignore next */
+  const assert = (property, message = null) => { property || fail(`Assertion failed${message !== null ? `: ${message}` : ''}`); };
 
   /**
    * @param {Object<string, Object<string, function(TestCase):void|Promise<any>>>} tests
    */
   const runTests = async tests => {
-    const numberOfTests = map$1(tests, mod => map$1(mod, f => /* istanbul ignore next */ f ? 1 : 0).reduce(add, 0)).reduce(add, 0);
+    /**
+     * @param {string} testname
+     */
+    const filterTest = testname => testname.startsWith('test') || testname.startsWith('benchmark');
+    const numberOfTests = map$1(tests, mod => map$1(mod, (f, fname) => /* c8 ignore next */ f && filterTest(fname) ? 1 : 0).reduce(add, 0)).reduce(add, 0);
     let successfulTests = 0;
     let testnumber = 0;
-    const start = performance.now();
+    const start = now();
     for (const modName in tests) {
       const mod = tests[modName];
       for (const fname in mod) {
         const f = mod[fname];
-        /* istanbul ignore else */
-        if (f) {
+        /* c8 ignore else */
+        if (f && filterTest(fname)) {
           const repeatEachTest = 1;
           let success = true;
           for (let i = 0; success && i < repeatEachTest; i++) {
             success = await run(modName, fname, f, testnumber, numberOfTests);
           }
           testnumber++;
-          /* istanbul ignore else */
+          /* c8 ignore else */
           if (success) {
             successfulTests++;
           }
         }
       }
     }
-    const end = performance.now();
+    const end = now();
     print('');
     const success = successfulTests === numberOfTests;
-    /* istanbul ignore next */
+    /* c8 ignore start */
     if (success) {
-      /* istanbul ignore next */
       print(GREEN, BOLD, 'All tests successful!', GREY, UNBOLD, ` in ${humanizeDuration(end - start)}`);
-      /* istanbul ignore next */
       printImgBase64(nyanCatImage, 50);
     } else {
       const failedTests = numberOfTests - successfulTests;
       print(RED, BOLD, `> ${failedTests} test${failedTests > 1 ? 's' : ''} failed`);
     }
+    /* c8 ignore stop */
     return success
   };
 
