@@ -14,7 +14,7 @@
   "scripts": {
     "clean": "rm -rf dist",
     "test": "npm run lint",
-    "dist": "rollup -c",
+    "dist": "rollup -c && cp ./src/y-indexeddb.js dist/y-indexeddb.mjs",
     "lint": "markdownlint README.md && standard && tsc",
     "preversion": "npm run clean && npm run lint && npm run dist",
     "debug": "concurrently 'rollup -wc' 'http-server -o .'"
