@@ -1,5 +1,12 @@
 # y-indexeddb
 
+> Nota bene: this repository is basically just a copy of the original [yjs/y-indexeddb](https://github.com/yjs/y-indexeddb) with one minor extension: it allows you to either
+>
+> * load the script directly from [https://rozek.github.io/y-indexeddb/dist/y-indexeddb.cjs](https://rozek.github.io/y-indexeddb/dist/y-indexeddb.cjs) or
+> * import its exports from [https://rozek.github.io/y-indexeddb/dist/y-indexeddb.mjs](https://rozek.github.io/y-indexeddb/dist/y-indexeddb.mjs)
+>
+> in case that you encounter some problems with [unpkg](https://unpkg.com/) - like me...
+
 > IndexedDB database provider for Yjs. [Documentation](https://docs.yjs.dev/ecosystem/database-provider/y-indexeddb)
 
 Use the IndexedDB database adapter to store your shared data persistently in
