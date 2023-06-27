@@ -124,6 +124,7 @@ console.log('persistence updated')
         }
       }
     }
+    this._storeUpdate = this._storeUpdate.bind(this)
     doc.on('update', this._storeUpdate)
     this.destroy = this.destroy.bind(this)
     doc.on('destroy', this.destroy)
