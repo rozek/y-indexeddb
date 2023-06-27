@@ -109,6 +109,7 @@ class IndexeddbPersistence extends observable.Observable {
      * @param {any} origin
      */
     this._storeUpdate = (update, origin) => {
+console.log('_storeUpdate');
       if (this.db && origin !== this) {
         const [updatesStore] = idb.transact(/** @type {IDBDatabase} */ (this.db), [updatesStoreName]);
 console.log('updating persistence');
@@ -128,7 +129,6 @@ console.log('persistence updated');
         }
       }
     };
-    this._storeUpdate = this._storeUpdate.bind(this);
     doc.on('update', this._storeUpdate);
     this.destroy = this.destroy.bind(this);
     doc.on('destroy', this.destroy);

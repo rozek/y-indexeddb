@@ -11219,6 +11219,7 @@
        * @param {any} origin
        */
       this._storeUpdate = (update, origin) => {
+  console.log('_storeUpdate');
         if (this.db && origin !== this) {
           const [updatesStore] = transact$1(/** @type {IDBDatabase} */ (this.db), [updatesStoreName]);
   console.log('updating persistence');
@@ -11238,7 +11239,6 @@
           }
         }
       };
-      this._storeUpdate = this._storeUpdate.bind(this);
       doc.on('update', this._storeUpdate);
       this.destroy = this.destroy.bind(this);
       doc.on('destroy', this.destroy);
