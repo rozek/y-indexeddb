@@ -1,6 +1,6 @@
 {
   "name": "y-indexeddb",
-  "version": "9.0.10",
+  "version": "9.0.11",
   "description": "IndexedDB database adapter for Yjs",
   "type": "module",
   "main": "./dist/y-indexeddb.cjs",
@@ -49,7 +49,7 @@
   },
   "homepage": "https://yjs.dev",
   "dependencies": {
-    "lib0": "^0.2.35"
+    "lib0": "^0.2.74"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^11.1.0",
@@ -60,7 +60,7 @@
     "markdownlint-cli": "^0.19.0",
     "rollup": "^1.32.1",
     "standard": "^11.0.1",
-    "typescript": "^3.9.7",
+    "typescript": "^5.0.4",
     "y-protocols": "^1.0.1",
     "yjs": "^13.4.7"
   },
