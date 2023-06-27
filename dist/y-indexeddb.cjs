@@ -3,8 +3,9 @@
 Object.defineProperty(exports, '__esModule', { value: true });
 
 var Y = require('yjs');
-var idb = require('lib0/dist/indexeddb.cjs');
-var observable_js = require('lib0/dist/observable.cjs');
+var idb = require('lib0/indexeddb');
+var promise = require('lib0/promise');
+var observable = require('lib0/observable');
 
 const customStoreName = 'custom';
 const updatesStoreName = 'updates';
@@ -14,8 +15,9 @@ const PREFERRED_TRIM_SIZE = 500;
 /**
  * @param {IndexeddbPersistence} idbPersistence
  * @param {function(IDBObjectStore):void} [beforeApplyUpdatesCallback]
+ * @param {function(IDBObjectStore):void} [afterApplyUpdatesCallback]
  */
-const fetchUpdates = (idbPersistence, beforeApplyUpdatesCallback = () => {}) => {
+const fetchUpdates = (idbPersistence, beforeApplyUpdatesCallback = () => {}, afterApplyUpdatesCallback = () => {}) => {
   const [updatesStore] = idb.transact(/** @type {IDBDatabase} */ (idbPersistence.db), [updatesStoreName]); // , 'readonly')
   return idb.getAll(updatesStore, idb.createIDBKeyRangeLowerBound(idbPersistence._dbref, false)).then(updates => {
     if (!idbPersistence._destroyed) {
@@ -23,6 +25,7 @@ const fetchUpdates = (idbPersistence, beforeApplyUpdatesCallback = () => {}) => 
       Y.transact(idbPersistence.doc, () => {
         updates.forEach(val => Y.applyUpdate(idbPersistence.doc, val));
       }, idbPersistence, false);
+      afterApplyUpdatesCallback(updatesStore);
     }
   })
     .then(() => idb.getLastKey(updatesStore).then(lastKey => { idbPersistence._dbref = lastKey + 1; }))
@@ -52,7 +55,7 @@ const clearDocument = name => idb.deleteDB(name);
 /**
  * @extends Observable<string>
  */
-class IndexeddbPersistence extends observable_js.Observable {
+class IndexeddbPersistence extends observable.Observable {
   /**
    * @param {string} name
    * @param {Y.Doc} doc
@@ -78,18 +81,20 @@ class IndexeddbPersistence extends observable_js.Observable {
     /**
      * @type {Promise<IndexeddbPersistence>}
      */
-    this.whenSynced = this._db.then(db => {
+    this.whenSynced = promise.create(resolve => this.on('synced', () => resolve(this)));
+
+    this._db.then(db => {
       this.db = db;
       /**
        * @param {IDBObjectStore} updatesStore
        */
       const beforeApplyUpdatesCallback = (updatesStore) => idb.addAutoKey(updatesStore, Y.encodeStateAsUpdate(doc));
-      return fetchUpdates(this, beforeApplyUpdatesCallback).then(() => {
+      const afterApplyUpdatesCallback = () => {
         if (this._destroyed) return this
-        this.emit('synced', [this]);
         this.synced = true;
-        return this
-      })
+        this.emit('synced', [this]);
+      };
+      fetchUpdates(this, beforeApplyUpdatesCallback, afterApplyUpdatesCallback);
     });
     /**
      * Timeout in ms untill data is merged and persisted in idb.
@@ -106,7 +111,9 @@ class IndexeddbPersistence extends observable_js.Observable {
     this._storeUpdate = (update, origin) => {
       if (this.db && origin !== this) {
         const [updatesStore] = idb.transact(/** @type {IDBDatabase} */ (this.db), [updatesStoreName]);
-        idb.addAutoKey(updatesStore, update);
+        idb.addAutoKey(updatesStore, update).then(() => {
+          this.emit('synced', update);
+        });
         if (++this._dbsize >= PREFERRED_TRIM_SIZE) {
           // debounce store call
           if (this._storeTimeoutId !== null) {
