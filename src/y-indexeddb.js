@@ -107,7 +107,9 @@ export class IndexeddbPersistence extends Observable {
     this._storeUpdate = (update, origin) => {
       if (this.db && origin !== this) {
         const [updatesStore] = idb.transact(/** @type {IDBDatabase} */ (this.db), [updatesStoreName])
-        idb.addAutoKey(updatesStore, update)
+        idb.addAutoKey(updatesStore, update).then(() => {
+          this.emit('synced', update)
+        })
         if (++this._dbsize >= PREFERRED_TRIM_SIZE) {
           // debounce store call
           if (this._storeTimeoutId !== null) {
