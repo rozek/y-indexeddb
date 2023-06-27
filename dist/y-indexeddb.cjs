@@ -97,7 +97,7 @@ class IndexeddbPersistence extends observable.Observable {
       fetchUpdates(this, beforeApplyUpdatesCallback, afterApplyUpdatesCallback);
     });
     /**
-     * Timeout in ms untill data is merged and persisted in idb.
+     * Timeout in ms until data is merged and persisted in idb.
      */
     this._storeTimeout = 1000;
     /**
@@ -111,8 +111,10 @@ class IndexeddbPersistence extends observable.Observable {
     this._storeUpdate = (update, origin) => {
       if (this.db && origin !== this) {
         const [updatesStore] = idb.transact(/** @type {IDBDatabase} */ (this.db), [updatesStoreName]);
+console.log('updating persistence');
         idb.addAutoKey(updatesStore, update).then(() => {
-          this.emit('synced', update);
+console.log('persistence updated');
+           this.emit('synced', [this]);
         });
         if (++this._dbsize >= PREFERRED_TRIM_SIZE) {
           // debounce store call
