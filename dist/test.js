@@ -11219,12 +11219,9 @@
        * @param {any} origin
        */
       this._storeUpdate = (update, origin) => {
-  console.log('_storeUpdate');
         if (this.db && origin !== this) {
           const [updatesStore] = transact$1(/** @type {IDBDatabase} */ (this.db), [updatesStoreName]);
-  console.log('updating persistence');
           addAutoKey(updatesStore, update).then(() => {
-  console.log('persistence updated');
              this.emit('synced', [this]);
           });
           if (++this._dbsize >= PREFERRED_TRIM_SIZE) {
