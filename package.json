@@ -13,6 +13,7 @@
   },
   "scripts": {
     "clean": "rm -rf dist",
+    "build": "npm run dist",
     "test": "npm run lint",
     "dist": "rollup -c && cp ./src/y-indexeddb.js dist/y-indexeddb.mjs",
     "lint": "markdownlint README.md && standard && tsc",
